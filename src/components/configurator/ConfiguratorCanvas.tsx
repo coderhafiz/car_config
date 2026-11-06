@@ -429,7 +429,7 @@ function SceneContent({
         intensity={config.lightIntensity * 1.1}
         color="#fffaf2"
         castShadow
-        shadow-mapSize={[1024, 1024]}
+        shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}
       />
 
@@ -498,7 +498,7 @@ function SceneContent({
         scale={360}
         blur={1.6}
         far={65}
-        resolution={512}
+        resolution={1024}
         color="#000000"
       />
     </>
@@ -561,7 +561,7 @@ export default function ConfiguratorCanvas({
         shadows={{ type: THREE.PCFShadowMap }}
         gl={{
           antialias: true,
-          alpha: false,
+          alpha: true,
           powerPreference: "high-performance",
           stencil: false,
           depth: true,

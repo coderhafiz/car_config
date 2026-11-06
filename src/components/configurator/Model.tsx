@@ -1777,6 +1777,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
 
       const partPath = getPartPath(mesh, root);
       const isCubeRoom = mesh.name === "Cube" || partPath.includes("cube");
+      const isCeilingLight = partPath.includes("superloop");
       const isLogo =
         mesh.name.toLowerCase().includes("text") ||
         partPath.toLowerCase().includes("text") ||
@@ -1819,7 +1820,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
         return;
       }
 
-      mesh.castShadow = false;
+      mesh.castShadow = !isCeilingLight;
       mesh.receiveShadow = true;
 
       const rawMats = Array.isArray(mesh.material)
