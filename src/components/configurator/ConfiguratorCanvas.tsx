@@ -237,43 +237,31 @@ function SceneContent({
     const studioMultiplier = isInterior ? 1.85 : 1.0;
     const ambientMultiplier = isInterior ? 4.2 : 1.0;
 
-    // Smooth light fade-in & Studio Light control for Superloop Light 200
-    if (superloopSpotRef.current)
-      easing.damp(
-        superloopSpotRef.current,
-        "intensity",
-        config.lightIntensity * 1.1 * studioMultiplier,
-        0.25,
-        delta,
-      );
-    if (superloopCenterRef.current)
-      easing.damp(
-        superloopCenterRef.current,
-        "intensity",
-        config.lightIntensity * 1.4 * studioMultiplier,
-        0.25,
-        delta,
-      );
+    // Smooth light fade-in & Studio Light control for Superloop Light 200 (gated to rest on idle frames)
+    const targetSpot = config.lightIntensity * 1.1 * studioMultiplier;
+    if (superloopSpotRef.current && Math.abs(superloopSpotRef.current.intensity - targetSpot) > 0.005) {
+      easing.damp(superloopSpotRef.current, "intensity", targetSpot, 0.25, delta);
+    }
+    const targetCenter = config.lightIntensity * 1.4 * studioMultiplier;
+    if (superloopCenterRef.current && Math.abs(superloopCenterRef.current.intensity - targetCenter) > 0.005) {
+      easing.damp(superloopCenterRef.current, "intensity", targetCenter, 0.25, delta);
+    }
     const ringIntensity = config.lightIntensity * 0.55 * studioMultiplier;
-    if (ringLight0Ref.current)
+    if (ringLight0Ref.current && Math.abs(ringLight0Ref.current.intensity - ringIntensity) > 0.005) {
       easing.damp(ringLight0Ref.current, "intensity", ringIntensity, 0.25, delta);
-    if (ringLight1Ref.current)
-      easing.damp(ringLight1Ref.current, "intensity", ringIntensity, 0.25, delta);
-    if (ringLight2Ref.current)
-      easing.damp(ringLight2Ref.current, "intensity", ringIntensity, 0.25, delta);
-    if (ringLight3Ref.current)
-      easing.damp(ringLight3Ref.current, "intensity", ringIntensity, 0.25, delta);
-    if (ambientLightRef.current)
-      easing.damp(
-        ambientLightRef.current,
-        "intensity",
-        config.lightIntensity * 0.25 * ambientMultiplier,
-        0.25,
-        delta,
-      );
+      if (ringLight1Ref.current) easing.damp(ringLight1Ref.current, "intensity", ringIntensity, 0.25, delta);
+      if (ringLight2Ref.current) easing.damp(ringLight2Ref.current, "intensity", ringIntensity, 0.25, delta);
+      if (ringLight3Ref.current) easing.damp(ringLight3Ref.current, "intensity", ringIntensity, 0.25, delta);
+    }
+    const targetAmbient = config.lightIntensity * 0.25 * ambientMultiplier;
+    if (ambientLightRef.current && Math.abs(ambientLightRef.current.intensity - targetAmbient) > 0.005) {
+      easing.damp(ambientLightRef.current, "intensity", targetAmbient, 0.25, delta);
+    }
     if (interiorFillRef.current) {
       const targetFill = isInterior ? config.lightIntensity * 2.2 : 0;
-      easing.damp(interiorFillRef.current, "intensity", targetFill, 0.25, delta);
+      if (Math.abs(interiorFillRef.current.intensity - targetFill) > 0.005) {
+        easing.damp(interiorFillRef.current, "intensity", targetFill, 0.25, delta);
+      }
       interiorFillRef.current.visible = isInterior || interiorFillRef.current.intensity > 0.05;
     }
 
@@ -348,10 +336,10 @@ function SceneContent({
       easing.damp3(controls.target, targetFoc.current, 0.35, delta);
       controls.update();
 
-      const posDist = state.camera.position.distanceTo(targetPos.current);
-      const focDist = controls.target.distanceTo(targetFoc.current);
+      const posDistSq = state.camera.position.distanceToSquared(targetPos.current);
+      const focDistSq = controls.target.distanceToSquared(targetFoc.current);
 
-      if (posDist < 0.08 && focDist < 0.08) {
+      if (posDistSq < 0.0064 && focDistSq < 0.0064) {
         state.camera.position.copy(targetPos.current);
         controls.target.copy(targetFoc.current);
 

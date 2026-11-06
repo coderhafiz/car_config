@@ -27,6 +27,8 @@ import {
 import { DRACOLoader, KTX2Loader, GLTFLoader } from "three-stdlib";
 import { MeshoptDecoder } from "meshoptimizer";
 
+const EMPTY_MATS: MeshPhysicalMaterial[] = [];
+
 // ─── Configuration types ──────────────────────────────────────────────────────
 
 export interface ConfigState {
@@ -1534,25 +1536,25 @@ export function Model({
       }
     }
 
-    // Smooth scale entrance
-    easing.damp(wrapperRef.current.scale, "x", targetScale, 0.2, delta);
-    easing.damp(wrapperRef.current.scale, "y", targetScale, 0.2, delta);
-    easing.damp(wrapperRef.current.scale, "z", targetScale, 0.2, delta);
+    // Smooth scale entrance (gated so it skips once targetScale is reached)
+    if (Math.abs(wrapperRef.current.scale.x - targetScale) > 0.001) {
+      easing.damp(wrapperRef.current.scale, "x", targetScale, 0.2, delta);
+      easing.damp(wrapperRef.current.scale, "y", targetScale, 0.2, delta);
+      easing.damp(wrapperRef.current.scale, "z", targetScale, 0.2, delta);
+    }
 
     const carRoot = wrapperRef.current.children[0];
-    const paintMats = (carRoot?.userData?.paintMaterials || []) as MeshPhysicalMaterial[];
-    const accentMats = (carRoot?.userData?.accentMaterials || []) as MeshPhysicalMaterial[];
+    const paintMats = (carRoot?.userData?.paintMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
+    const accentMats = (carRoot?.userData?.accentMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
 
     // Immediate initial color sync on model load / switch
     if (needsImmediateColorSyncRef.current) {
       needsImmediateColorSyncRef.current = false;
       for (let i = 0; i < paintMats.length; i++) {
         paintMats[i].color.copy(targetPaintColor.current);
-        paintMats[i].needsUpdate = true;
       }
       for (let i = 0; i < accentMats.length; i++) {
         accentMats[i].color.copy(targetAccentColor.current);
-        accentMats[i].needsUpdate = true;
       }
     }
 
@@ -1915,13 +1917,22 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
   const logoCarWashRef = useRef<PointLight>(null);
   const logoSpotRef = useRef<SpotLight>(null);
 
+  useEffect(() => {
+    if (logoSpotRef.current) {
+      logoSpotRef.current.target.position.set(0, 15, 0);
+      logoSpotRef.current.target.updateMatrixWorld();
+    }
+  }, []);
+
   useFrame((state, delta) => {
     const targetEmissive = lightIntensity * 2.5;
     const showroomRoot = showroomGroupRef.current?.children[0];
 
-    const emissiveMats = (showroomRoot?.userData?.emissiveMaterials as MeshPhysicalMaterial[]) || [];
-    for (let i = 0; i < emissiveMats.length; i++) {
-      easing.damp(emissiveMats[i], "emissiveIntensity", targetEmissive, 0.2, delta);
+    const emissiveMats = (showroomRoot?.userData?.emissiveMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
+    if (emissiveMats.length > 0 && Math.abs(emissiveMats[0].emissiveIntensity - targetEmissive) > 0.01) {
+      for (let i = 0; i < emissiveMats.length; i++) {
+        easing.damp(emissiveMats[i], "emissiveIntensity", targetEmissive, 0.2, delta);
+      }
     }
 
     // Slower, graceful pulsation cycle (~6 seconds)
@@ -1933,7 +1944,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
     // Controlled emissive power for the letters - keeps blue deeply saturated without blowing out to white
     const dynamicLogoEmissive = 2.0 + pulseFactor * 0.8;
 
-    const logoMats = (showroomRoot?.userData?.logoMaterials as MeshPhysicalMaterial[]) || [];
+    const logoMats = (showroomRoot?.userData?.logoMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
     for (let i = 0; i < logoMats.length; i++) {
       const mat = logoMats[i];
       mat.color.copy(currentLogoColor);
@@ -1954,8 +1965,6 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
 
     if (logoSpotRef.current) {
       logoSpotRef.current.color.copy(currentLogoColor);
-      logoSpotRef.current.target.position.set(0, 15, 0);
-      logoSpotRef.current.target.updateMatrixWorld();
       easing.damp(
         logoSpotRef.current,
         "intensity",
