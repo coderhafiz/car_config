@@ -1578,23 +1578,44 @@ export function Model({
       }
     }
 
-    // Smooth color lerping transitions using Three.js dampC
-    const colorSmoothTime = 0.28;
-    for (let i = 0; i < paintMats.length; i++) {
-      easing.dampC(
-        paintMats[i].color,
-        targetPaintColor.current,
-        colorSmoothTime,
-        delta,
-      );
+    // Smooth color lerping transitions using Three.js dampC (only active while transitioning)
+    if (paintMats.length > 0) {
+      const pColor = paintMats[0].color;
+      const tColor = targetPaintColor.current;
+      const diffSq =
+        (pColor.r - tColor.r) ** 2 +
+        (pColor.g - tColor.g) ** 2 +
+        (pColor.b - tColor.b) ** 2;
+      if (diffSq > 0.00005) {
+        const colorSmoothTime = 0.28;
+        for (let i = 0; i < paintMats.length; i++) {
+          easing.dampC(
+            paintMats[i].color,
+            tColor,
+            colorSmoothTime,
+            delta,
+          );
+        }
+      }
     }
-    for (let i = 0; i < accentMats.length; i++) {
-      easing.dampC(
-        accentMats[i].color,
-        targetAccentColor.current,
-        colorSmoothTime,
-        delta,
-      );
+    if (accentMats.length > 0) {
+      const aColor = accentMats[0].color;
+      const tColor = targetAccentColor.current;
+      const diffSq =
+        (aColor.r - tColor.r) ** 2 +
+        (aColor.g - tColor.g) ** 2 +
+        (aColor.b - tColor.b) ** 2;
+      if (diffSq > 0.00005) {
+        const colorSmoothTime = 0.28;
+        for (let i = 0; i < accentMats.length; i++) {
+          easing.dampC(
+            accentMats[i].color,
+            tColor,
+            colorSmoothTime,
+            delta,
+          );
+        }
+      }
     }
   });
 
@@ -1756,7 +1777,6 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
 
       const partPath = getPartPath(mesh, root);
       const isCubeRoom = mesh.name === "Cube" || partPath.includes("cube");
-      const isCeilingLight = partPath.includes("superloop");
       const isLogo =
         mesh.name.toLowerCase().includes("text") ||
         partPath.toLowerCase().includes("text") ||
@@ -1799,7 +1819,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
         return;
       }
 
-      mesh.castShadow = !isCeilingLight;
+      mesh.castShadow = false;
       mesh.receiveShadow = true;
 
       const rawMats = Array.isArray(mesh.material)

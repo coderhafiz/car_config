@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useMemo } from "react";
+import { Suspense, useEffect, useRef, useMemo, useState } from "react";
 import { Canvas, useThree, useFrame, RootState } from "@react-three/fiber";
 import {
   Environment,
@@ -274,6 +274,7 @@ function SceneContent({
     if (interiorFillRef.current) {
       const targetFill = isInterior ? config.lightIntensity * 2.2 : 0;
       easing.damp(interiorFillRef.current, "intensity", targetFill, 0.25, delta);
+      interiorFillRef.current.visible = isInterior || interiorFillRef.current.intensity > 0.05;
     }
 
     // Smoothly adjust camera FOV for interior zoom and pan the scene on mobile
@@ -428,7 +429,7 @@ function SceneContent({
         intensity={config.lightIntensity * 1.1}
         color="#fffaf2"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[1024, 1024]}
         shadow-bias={-0.0004}
       />
 
@@ -477,6 +478,7 @@ function SceneContent({
         decay={0.2}
         distance={140}
         intensity={0}
+        visible={config.viewMode === "interior"}
       />
 
       <Suspense fallback={<CanvasLoader hidden={isInitialLoading} />}>
@@ -496,7 +498,7 @@ function SceneContent({
         scale={360}
         blur={1.6}
         far={65}
-        resolution={1024}
+        resolution={512}
         color="#000000"
       />
     </>
@@ -512,6 +514,7 @@ export default function ConfiguratorCanvas({
   const carRotationRef = useRef(config.rotationY);
   const isDraggingCarRef = useRef(false);
   const lastPointerXRef = useRef(0);
+  const [dpr, setDpr] = useState(1.5);
 
   const canDragRotateCar = config.viewMode === "exterior";
 
@@ -558,17 +561,20 @@ export default function ConfiguratorCanvas({
         shadows={{ type: THREE.PCFShadowMap }}
         gl={{
           antialias: true,
-          alpha: true,
+          alpha: false,
           powerPreference: "high-performance",
           stencil: false,
           depth: true,
         }}
-        dpr={[1, 2]}
+        dpr={dpr}
         className="w-full h-full"
       >
         <PreloadModels />
         <PreloadTextures />
-        <PerformanceMonitor />
+        <PerformanceMonitor
+          onDecline={() => setDpr(1)}
+          onIncline={() => setDpr(1.5)}
+        />
 
         <Suspense fallback={null}>
           <PerspectiveCamera
