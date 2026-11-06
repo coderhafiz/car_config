@@ -1,0 +1,1997 @@
+"use client";
+
+import { useRef, useEffect, useMemo } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
+import { useGLTF } from "@react-three/drei";
+import { easing } from "maath";
+import {
+  Mesh,
+  MeshStandardMaterial,
+  MeshPhysicalMaterial,
+  Box3,
+  Vector3,
+  Matrix4,
+  Object3D,
+  Group,
+  WebGLRenderer,
+  BackSide,
+  DoubleSide,
+  CanvasTexture,
+  RepeatWrapping,
+  SRGBColorSpace,
+  BufferAttribute,
+  Color,
+  PointLight,
+  SpotLight,
+} from "three";
+import { DRACOLoader, KTX2Loader, GLTFLoader } from "three-stdlib";
+import { MeshoptDecoder } from "meshoptimizer";
+
+// ─── Configuration types ──────────────────────────────────────────────────────
+
+export interface ConfigState {
+  mainColor: string;
+  accentColor: string;
+  interiorColor: string;
+  selectedModel: string;
+  isAnimated: boolean;
+  rotationY: number;
+  zoom: number;
+  lightIntensity: number;
+  partColors: Record<string, string>;
+  viewMode: "exterior" | "interior";
+  selectedTexture: string;
+  /** True when the selected exterior paint is a matte finish */
+  mattePaint: boolean;
+}
+
+export const TEXTURES = [
+  { id: "none", name: "Smooth Solid" },
+  { id: "leather", name: "Nappa Leather (KTX2)" },
+  { id: "linen", name: "Sport Technical (KTX2)" },
+  { id: "velvet", name: "Alcantara / Race-Tex (KTX2)" },
+];
+
+export const TEXTURE_PATHS: Record<string, Record<string, string>> = {
+  leather: {
+    map: "/textures/leather/diffuse.ktx2",
+    normalMap: "/textures/leather/normal.ktx2",
+    roughnessMap: "/textures/leather/roughness.ktx2",
+  },
+  linen: {
+    map: "/textures/linen/diffuse.ktx2",
+    normalMap: "/textures/linen/normal.ktx2",
+    aoMap: "/textures/linen/arm.ktx2",
+  },
+  velvet: {
+    map: "/textures/velvet/diffuse.ktx2",
+    normalMap: "/textures/velvet/normal.ktx2",
+    aoMap: "/textures/velvet/arm.ktx2",
+  },
+};
+
+export interface CameraPreset {
+  position: [number, number, number];
+  target: [number, number, number];
+  label: string;
+}
+
+export interface ModelPart {
+  id: string;
+  name: string;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  brand: string;
+  year: number;
+  description: string;
+  price: number;
+  url: string;
+  type: string;
+  scale: number;
+  rotationX?: number;
+  parts: ModelPart[];
+  materialType: string;
+  /** Camera node name from GLTF used for interior view */
+  interiorCameraName?: string;
+  /** Exterior preset (derived from GLTF camera or fallback) */
+  exteriorCamera: CameraPreset;
+  /** Interior camera position from GLTF data */
+  interiorCamera: CameraPreset;
+  accentColor: string;
+  /**
+   * Several GLTF files were exported from Blender without applying their
+   * Mirror modifiers, so only one half of many parts (body panels, glass,
+   * lights, wheels…) is present in the file. This describes how to rebuild
+   * the missing halves at load time.
+   */
+  symmetry?: SymmetryConfig;
+  /** Extra GLTF material names that are the body paint (beyond "*paint*") */
+  paintMaterials?: string[];
+}
+
+export interface SymmetryConfig {
+  /** Lateral (left/right) axis of the car in GLTF world space */
+  axis: "x" | "z";
+  /** Which one-sided halves to mirror: "+" = above the plane, "-" = below */
+  sides: ("+" | "-")[];
+  /** Asymmetric parts that must never be mirrored (steering wheel, gauges…) */
+  exclude?: string[];
+  /** Optional regex pattern to only mirror parts whose name or geometry matches */
+  matchPattern?: RegExp;
+  /** Optional explicit list of node names to mirror across the lateral axis */
+  includeNodes?: string[];
+  /**
+   * Front ↔ rear mirroring for wheel parts that only exist on one axle.
+   * The plane is the world position of the `planeNode` empty (the original
+   * Blender mirror object).
+   */
+  axle?: { axis: "x" | "z"; planeNode: string; nodes: string[] };
+}
+
+// ─── Car definitions (from GLTF mesh node inspection) ────────────────────────
+// Camera positions are derived from each GLTF file's camera node translations,
+// scaled to Three.js scene units (model bounding box ~250 units).
+// GLTF camera translations are in Blender meters; scale factor ~30x for our scene.
+
+export const MODELS: ModelInfo[] = [
+  {
+    id: "audi-r8",
+    name: "Audi R8",
+    brand: "Audi",
+    year: 2023,
+    description:
+      "Bespoke Khaz styling program featuring carbon aerodynamic styling, custom caliper detailing, and signature bespoke coachwork finish.",
+    price: 158900,
+    url: "/cars/Car_config.gltf",
+    type: "gltf",
+    scale: 1,
+    rotationX: 0,
+    accentColor: "#D4D8DD",
+    // Parts identified from GLTF node names
+    parts: [
+      { id: "Caliper", name: "Brake Calipers" },
+      { id: "Caliper.001", name: "Brake Calipers (Rear)" },
+      { id: "Tire05_low", name: "Front Tire" },
+      { id: "Tire05_low.001", name: "Rear Tire" },
+    ],
+    materialType: "Carbon Fiber / Leather",
+    interiorCameraName: "Camera.006",
+    // Only the +X (driver) half of the body, glass, lights and rear wheel
+    // assembly is present in the file.
+    symmetry: {
+      axis: "x",
+      sides: ["+"],
+      // Steering wheel + instrument binnacle (driver side only)
+      exclude: [
+        "Circle.002",
+        "Circle.003",
+        "Sphere.001",
+        "Sphere.002",
+        "Subdiv#5.036",
+        "Subdiv#5.038",
+        "Subdiv#5.040",
+        "Subdiv#5.048",
+      ],
+    },
+    // GLTF Camera.006 translation: [5.64, 4.72, 7.31] → scaled ×30, framed inside Showroom
+    exteriorCamera: {
+      position: [175, 95, 215],
+      target: [0, 30, 0],
+      label: "Exterior",
+    },
+    // GLTF Camera.006 world position/forward transformed to centered 250-unit scene
+    interiorCamera: {
+      position: [1.6, 61.1, -17],
+      target: [1.6, 46.2, 41.1],
+      label: "Interior",
+    },
+  },
+  {
+    id: "audi-rs6",
+    name: "Audi RS6 Avant",
+    brand: "Audi",
+    year: 2020,
+    description:
+      "Signature widebody styling package with tailored carbon splitter, custom forged alloys, and bespoke interior appointments.",
+    price: 117900,
+    url: "/cars/Car_config1.gltf",
+    type: "gltf",
+    scale: 1,
+    rotationX: 0,
+    accentColor: "#7A8088",
+    parts: [
+      { id: "WholeBody", name: "Body" },
+      { id: "WholeBody.001", name: "Body Panels" },
+      { id: "Seating-front", name: "Front Seats" },
+      { id: "Seating-rear", name: "Rear Seats" },
+      { id: "Seating base", name: "Seat Base" },
+      { id: "Rims.001", name: "Wheels" },
+      { id: "Rims-Mirror", name: "Mirror Trim" },
+      { id: "Dashboard", name: "Dashboard" },
+      { id: "Carpet interior", name: "Interior Carpet" },
+    ],
+    materialType: "Nappa Leather / Alcantara",
+    interiorCameraName: "Camera.007",
+    symmetry: {
+      axis: "z",
+      sides: ["+", "-"],
+      exclude: ["Wheels"], // steering wheel
+      // "Rims-Mirror" is the Blender empty used to mirror the front wheel
+      axle: {
+        axis: "x",
+        planeNode: "Rims-Mirror",
+        nodes: ["Rims.001", "Caliper", "Disk"],
+      },
+    },
+    exteriorCamera: {
+      position: [185, 100, 225],
+      target: [0, 30, 0],
+      label: "Exterior",
+    },
+    interiorCamera: {
+      position: [24.8, 59.5, 2.4],
+      target: [-32.7, 42.9, -1.2],
+      label: "Interior",
+    },
+  },
+  {
+    id: "audi-rs8",
+    name: "Audi RS8 Sport",
+    brand: "Audi",
+    year: 2023,
+    description:
+      "Flagship bespoke grand tourer conversion featuring sculpted aerodynamic package, tailored forged wheels, and handcrafted cabin.",
+    price: 189500,
+    url: "/cars/Car_config2.gltf",
+    type: "gltf",
+    scale: 1,
+    rotationX: 0,
+    accentColor: "#D4D8DD",
+    parts: [
+      { id: "Body", name: "Body" },
+      { id: "WholeBody", name: "Body Panels" },
+      { id: "Seating base", name: "Seat Base" },
+      { id: "Seating base.001", name: "Seat Base Alt" },
+      { id: "Seating-rear", name: "Rear Seats" },
+      { id: "Rims.001", name: "Wheels" },
+      { id: "Dashboard", name: "Dashboard" },
+      { id: "Spoiler", name: "Rear Spoiler" },
+      { id: "Grill", name: "Front Grille" },
+    ],
+    materialType: "Carbon Fiber / RS Sport Leather",
+    interiorCameraName: "Camera",
+    symmetry: {
+      axis: "z",
+      sides: ["+", "-"],
+      // "Wheels" is the Blender empty used to mirror the single wheel
+      axle: {
+        axis: "x",
+        planeNode: "Wheels",
+        nodes: ["Rims.001", "Tires", "Brakes"],
+      },
+    },
+    exteriorCamera: {
+      position: [175, 95, 215],
+      target: [0, 30, 0],
+      label: "Exterior",
+    },
+    interiorCamera: {
+      position: [12.8, 55.6, -6.7],
+      target: [-43.8, 39.7, 5],
+      label: "Interior",
+    },
+  },
+  {
+    id: "porsche-911",
+    name: "Porsche 911 992",
+    brand: "Porsche",
+    year: 2023,
+    description:
+      "Bespoke rear-engine custom program with tailored exterior styling, precision forged rims, and signature race-tex appointments.",
+    price: 142700,
+    url: "/cars/Car_config3.glb",
+    type: "gltf",
+    scale: 1,
+    rotationX: 0,
+    accentColor: "#D4AF37",
+    parts: [
+      { id: "body.002", name: "Body" },
+      { id: "body.003", name: "Body Lower" },
+      { id: "bseats.002", name: "Seats" },
+      { id: "bwheels.002", name: "Wheels" },
+      { id: "blights.002", name: "Lights" },
+      { id: "bbumper.002", name: "Bumpers" },
+      { id: "fbumper.002", name: "Front Bumper" },
+      { id: "doors.002", name: "Doors" },
+      { id: "mirrors.002", name: "Mirrors" },
+    ],
+    materialType: "Semi-Aniline Leather / Race-Tex",
+    interiorCameraName: "Camera.010",
+    // The 911's body panels use a generic "Material.022" paint material
+    paintMaterials: ["Material.022"],
+    exteriorCamera: {
+      position: [175, 95, 215],
+      target: [0, 30, 0],
+      label: "Exterior",
+    },
+    interiorCamera: {
+      position: [2.6, 52.4, -26.7],
+      target: [1.8, 39.9, 32],
+      label: "Interior",
+    },
+  },
+  {
+    id: "chevrolet-corvette-c8",
+    name: "Chevrolet Corvette C8",
+    brand: "Chevrolet",
+    year: 2025,
+    description:
+      "Bespoke mid-engine American supercar featuring tailored aerodynamic coachwork, forged performance alloys, and handcrafted cabin appointments.",
+    price: 135800,
+    url: "/cars/chevrolet.glb",
+    type: "gltf",
+    scale: 1,
+    rotationX: 0,
+    accentColor: "#D4D8DD",
+    parts: [
+      { id: "Motor Door", name: "Body & Hood" },
+      { id: "Door.001", name: "Doors" },
+      { id: "Circle.004", name: "Front Wheels" },
+      { id: "Circle.014", name: "Rear Wheels" },
+      { id: "Plane.056", name: "Mirrors" },
+    ],
+    materialType: "Semi-Aniline Leather / Napa Trim",
+    interiorCameraName: "Camera.001",
+    paintMaterials: ["carpaint"],
+    exteriorCamera: {
+      position: [180, 95, 215],
+      target: [0, 30, 0],
+      label: "Exterior",
+    },
+    interiorCamera: {
+      position: [18, 56, -6],
+      target: [18, 48, 28],
+      label: "Interior",
+    },
+  },
+  {
+    id: "lamborghini-revuelto",
+    name: "Lamborghini Revuelto",
+    brand: "Lamborghini",
+    year: 2024,
+    description:
+      "Flagship V12 HPEV hybrid hypercar featuring an aeronautics-inspired carbon monofuselage, active aerodynamics, and bespoke Khaz coachwork finish.",
+    price: 608358,
+    url: "/cars/lamboghini_1.glb",
+    type: "glb",
+    scale: 1,
+    rotationX: 0,
+    accentColor: "#D4D8DD",
+    parts: [
+      { id: "AM-Lamborghini Revuelto.164", name: "Monofuselage Carbon Body" },
+      { id: "AM-Lamborghini Revuelto.249", name: "Front Forged Y-Spoke Wheels" },
+      { id: "AM-Lamborghini Revuelto.253", name: "Rear Forged Y-Spoke Wheels" },
+      { id: "AM-Lamborghini Revuelto.248", name: "Dual Hex Sport Exhaust" },
+      { id: "AM-Lamborghini Revuelto.239", name: "Performance Tires" },
+      { id: "AM-Lamborghini Revuelto.195", name: "Corsatex Bucket Seats" },
+      { id: "AM-Lamborghini Revuelto.198", name: "Cockpit Steering Wheel" },
+      { id: "AM-Lamborghini Revuelto.141", name: "Wing Mirrors & Aero Stalks" },
+    ],
+    materialType: "Monofuselage Carbon / Corsatex",
+    interiorCameraName: "Camera.002",
+    paintMaterials: ["The-Best-CarPiant-amj"],
+    exteriorCamera: {
+      position: [180, 95, 215],
+      target: [0, 30, 0],
+      label: "Exterior",
+    },
+    interiorCamera: {
+      position: [18, 56, -8],
+      target: [15, 48, 32],
+      label: "Interior",
+    },
+  },
+];
+
+// ─── DRACO / KTX2 loader singletons ──────────────────────────────────────────
+
+let dracoLoader: DRACOLoader | null = null;
+let ktx2Loader: KTX2Loader | null = null;
+
+function getDracoLoader() {
+  if (!dracoLoader) {
+    dracoLoader = new DRACOLoader();
+    // Use the local Draco decoders copied from the reference project
+    dracoLoader.setDecoderPath("/draco/");
+  }
+  return dracoLoader;
+}
+
+function getKTX2Loader(gl: WebGLRenderer) {
+  if (!ktx2Loader) {
+    ktx2Loader = new KTX2Loader();
+    ktx2Loader.setTranscoderPath("/basis/");
+    ktx2Loader.detectSupport(gl);
+  }
+  return ktx2Loader;
+}
+
+export function setupLoaders(loader: GLTFLoader, gl: WebGLRenderer) {
+  loader.setDRACOLoader(getDracoLoader());
+  loader.setKTX2Loader(getKTX2Loader(gl));
+  loader.setMeshoptDecoder(MeshoptDecoder);
+}
+
+// ─── Preload helpers ──────────────────────────────────────────────────────────
+
+export function preloadCarModel(url: string) {
+  useGLTF.preload(url, undefined, undefined, (loader) => {
+    // Uses the singleton Draco / KTX2 / Meshopt decoders
+    (loader as GLTFLoader).setDRACOLoader(getDracoLoader());
+    (loader as GLTFLoader).setMeshoptDecoder(MeshoptDecoder);
+  });
+}
+
+export function PreloadModels() {
+  const { gl } = useThree();
+  useEffect(() => {
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (isSafari || isIOS) return;
+
+    // 1. High-priority preload: Showroom + initial default car (Audi R8)
+    //    Gets 100% of browser connections without network contention
+    useGLTF.preload("/cars/ShowRoom.gltf", undefined, undefined, (loader) =>
+      setupLoaders(loader as GLTFLoader, gl)
+    );
+    useGLTF.preload("/cars/KhazCustomsLogo.glb", undefined, undefined, (loader) =>
+      setupLoaders(loader as GLTFLoader, gl)
+    );
+    useGLTF.preload(MODELS[0].url, undefined, undefined, (loader) =>
+      setupLoaders(loader as GLTFLoader, gl)
+    );
+
+    // 2. Staggered background preloading for remaining cars (RS6, RS8, Porsche)
+    //    Downloads one model at a time after initial scene is on screen
+    const otherModels = MODELS.slice(1);
+    const timers = otherModels.map((model, idx) =>
+      setTimeout(() => {
+        useGLTF.preload(model.url, undefined, undefined, (loader) =>
+          setupLoaders(loader as GLTFLoader, gl)
+        );
+      }, 1200 + idx * 1000)
+    );
+
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [gl]);
+  return null;
+}
+
+export function PreloadTextures() {
+  return null;
+}
+
+// ─── Symmetry restoration ────────────────────────────────────────────────────
+
+const AXIS_INDEX = { x: 0, z: 2 } as const;
+
+/** Three.js GLTFLoader strips "." and spaces from node names */
+function sanitizeNodeName(name: string): string {
+  return name.replace(/\./g, "").replace(/\s/g, "_");
+}
+
+/** Returns the object that directly holds the car's part nodes */
+function findPartsContainer(root: Object3D): Object3D {
+  let best: Object3D = root;
+  root.traverse((o) => {
+    if (o.children.length > best.children.length) best = o;
+  });
+  return best;
+}
+
+/**
+ * Re-creates the halves of parts that were lost because Blender's Mirror
+ * modifiers were not applied on export. Mirrored copies share geometry and
+ * materials with the original part, so colour changes apply to both.
+ */
+function restoreSymmetry(root: Object3D, symmetry: SymmetryConfig) {
+  root.updateMatrixWorld(true);
+  const container = findPartsContainer(root);
+  const containerWorld = container.matrixWorld.clone();
+  const containerWorldInv = containerWorld.clone().invert();
+
+  const lateral = AXIS_INDEX[symmetry.axis];
+  const plane = new Vector3().setFromMatrixPosition(containerWorld).getComponent(lateral);
+  const exclude = new Set((symmetry.exclude ?? []).map(sanitizeNodeName));
+  const includeNodesSet = symmetry.includeNodes
+    ? new Set(symmetry.includeNodes.map(sanitizeNodeName))
+    : null;
+
+  // Reflection across a world-space plane, expressed in container space
+  const reflect = (axis: number, value: number) => {
+    const s = new Vector3(1, 1, 1).setComponent(axis, -1);
+    const t = new Vector3().setComponent(axis, 2 * value);
+    const world = new Matrix4().makeScale(s.x, s.y, s.z).setPosition(t);
+    return containerWorldInv.clone().multiply(world).multiply(containerWorld);
+  };
+
+  const mirrorPart = (part: Object3D, reflection: Matrix4) => {
+    const copy = part.clone();
+    copy.name = `${part.name}_mirror`;
+    copy.matrix.copy(reflection).multiply(part.matrix);
+    copy.matrix.decompose(copy.position, copy.quaternion, copy.scale);
+
+    // Negative scaling from mirroring flips triangle winding; ensure DoubleSide
+    // so backface culling does not cull mirrored or original geometry
+    copy.traverse((c) => {
+      if (c instanceof Mesh && c.material) {
+        const rawMats = Array.isArray(c.material) ? c.material : [c.material];
+        rawMats.forEach((m) => {
+          if (m) m.side = DoubleSide;
+        });
+      }
+    });
+    part.traverse((c) => {
+      if (c instanceof Mesh && c.material) {
+        const rawMats = Array.isArray(c.material) ? c.material : [c.material];
+        rawMats.forEach((m) => {
+          if (m) m.side = DoubleSide;
+        });
+      }
+    });
+
+    container.add(copy);
+    return copy;
+  };
+
+  const EPS = 0.05;
+  const lateralReflection = reflect(lateral, plane);
+  const mirrored = new Map<string, Object3D>();
+  const box = new Box3();
+
+  [...container.children].forEach((part) => {
+    if (exclude.has(part.name)) return;
+    if (includeNodesSet) {
+      if (!includeNodesSet.has(sanitizeNodeName(part.name))) return;
+    } else if (symmetry.matchPattern) {
+      let matched = symmetry.matchPattern.test(part.name);
+      if (!matched) {
+        part.traverse((c) => {
+          if (c.name && symmetry.matchPattern!.test(c.name)) matched = true;
+          if (
+            (c as { geometry?: { name?: string } }).geometry?.name &&
+            symmetry.matchPattern!.test((c as { geometry?: { name?: string } }).geometry!.name!)
+          ) {
+            matched = true;
+          }
+          if (c instanceof Mesh && c.material) {
+            const rawMats = Array.isArray(c.material) ? c.material : [c.material];
+            rawMats.forEach((m) => {
+              if (m && m.name && symmetry.matchPattern!.test(m.name)) matched = true;
+            });
+          }
+        });
+      }
+      if (!matched) return;
+    }
+    box.setFromObject(part);
+    if (box.isEmpty()) return; // empties, cameras, lights
+
+    const min = box.min.getComponent(lateral);
+    const max = box.max.getComponent(lateral);
+    const isCentered = min >= plane - EPS && max <= plane + EPS;
+    const side = isCentered
+      ? null
+      : min >= plane - EPS
+        ? "+"
+        : max <= plane + EPS
+          ? "-"
+          : null;
+    if (side && symmetry.sides.includes(side)) {
+      mirrored.set(part.name, mirrorPart(part, lateralReflection));
+    }
+  });
+
+  // Front ↔ rear duplication of wheel parts that only exist on one axle
+  if (symmetry.axle) {
+    const planeNode = root.getObjectByName(sanitizeNodeName(symmetry.axle.planeNode));
+    if (planeNode) {
+      const axleAxis = AXIS_INDEX[symmetry.axle.axis];
+      const axlePlane = new Vector3()
+        .setFromMatrixPosition(planeNode.matrixWorld)
+        .getComponent(axleAxis);
+      const axleReflection = reflect(axleAxis, axlePlane);
+
+      symmetry.axle.nodes.map(sanitizeNodeName).forEach((name) => {
+        const part = container.children.find((c) => c.name === name);
+        if (!part) return;
+        mirrorPart(part, axleReflection);
+        const sideCopy = mirrored.get(name);
+        if (sideCopy) mirrorPart(sideCopy, axleReflection);
+      });
+    }
+  }
+}
+
+// ─── Material helpers ────────────────────────────────────────────────────────
+
+type MaterialCategory = "glass" | "paint" | "accent" | "interior" | "other";
+
+/**
+ * Collects the name of `obj` and all of its ancestor nodes up to `root`.
+ * Multi-primitive GLTF meshes are loaded as a `Group` (with the GLTF node name)
+ * containing child `Mesh` objects named after the mesh primitive (`Circle063_4`,
+ * `Mesh008_1`, etc.), so checking ancestor names is required to identify which
+ * car part a leaf mesh belongs to.
+ */
+function getPartPath(obj: Object3D, root: Object3D): string {
+  const names: string[] = [];
+  let curr: Object3D | null = obj;
+  while (curr && curr !== root) {
+    if (curr.name) names.push(curr.name);
+    curr = curr.parent;
+  }
+  return names.join(" ").toLowerCase();
+}
+
+/**
+ * Clones any `MeshStandardMaterial` as a `MeshPhysicalMaterial`, preserving all
+ * original textures (`map`, `normalMap`, `roughnessMap`, `metalnessMap`, `aoMap`,
+ * `emissiveMap`), UV transforms, colors, and PBR parameters.
+ */
+function cloneAsPhysicalMaterial(
+  m: MeshStandardMaterial
+): MeshPhysicalMaterial {
+  if (m instanceof MeshPhysicalMaterial || (m as unknown as { isMeshPhysicalMaterial?: boolean }).isMeshPhysicalMaterial) {
+    return (m as MeshPhysicalMaterial).clone();
+  }
+  const phys = new MeshPhysicalMaterial();
+  MeshStandardMaterial.prototype.copy.call(phys, m);
+  return phys;
+}
+
+/**
+ * Repairs missing or broken PBR material properties in the raw GLTF assets:
+ * - Unassigned primitives (`mat.name === ""`) or empty GLTF material definitions
+ *   that default to opaque flat white (`#ffffff`, `metalness: 1, roughness: 1`)
+ * - Glass/lens materials with `KHR_materials_transmission` + white `baseColorFactor`
+ *   that render as milky white sheets
+ * - Materials missing `metallicFactor` in GLTF (which default to `metalness = 1.0`
+ *   on rubber tires, leather interiors, etc.)
+ * - Over-driven `KHR_materials_specular` (>1.0) and zero-roughness black trim
+ */
+function fixStaticMaterialDefaults(
+  mat: MeshStandardMaterial,
+  modelId?: string
+): void {
+  const m = (mat.name || "").toLowerCase();
+
+  const disableTransmissionAndClampSpecular = () => {
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.transmission = 0;
+      mat.transmissionMap = null;
+      mat.thickness = 0;
+      mat.ior = 1.5;
+      mat.anisotropy = 0;
+      mat.anisotropyMap = null;
+      mat.sheen = 0;
+      if (mat.sheenColor) mat.sheenColor.set("#000000");
+      mat.sheenColorMap = null;
+      mat.sheenRoughnessMap = null;
+      mat.specularIntensity = Math.min(mat.specularIntensity, 0.5);
+      mat.specularColor.set("#ffffff");
+    }
+  };
+
+  // Lamborghini Revuelto: preserve authored PBR textures (carbon fiber, tire maps, leathers, screens, metallic trim)
+  if (modelId === "lamborghini-revuelto") {
+    // 1. Transparent glass, windows, lenses, headlights:
+    if (
+      m === "headlight" ||
+      m === "lens" ||
+      m === "windows.001" ||
+      m === "taillight_glass" ||
+      m.includes("glass") ||
+      m.includes("window")
+    ) {
+      disableTransmissionAndClampSpecular();
+      if (m === "taillight_glass") {
+        mat.color.set("#ff1818");
+        mat.transparent = true;
+        mat.opacity = 0.72;
+      } else {
+        mat.color.set("#1a1a20");
+        mat.transparent = true;
+        mat.opacity = 0.28;
+      }
+      mat.roughness = 0.05;
+      mat.metalness = 0.1;
+      mat.depthWrite = false;
+      return;
+    }
+
+    // 2. Interior Corsatex velour/velvet: replace hot-pink sheen with luxurious Nero Corsatex
+    if (m.includes("velour") || m.includes("velvet")) {
+      mat.color.set("#1c1c20");
+      mat.roughness = 0.92;
+      mat.metalness = 0.0;
+      if (mat instanceof MeshPhysicalMaterial) {
+        mat.clearcoat = 0.0;
+        mat.sheen = 0;
+        if (mat.sheenColor) mat.sheenColor.set("#000000");
+        mat.sheenColorMap = null;
+        mat.sheenRoughnessMap = null;
+        mat.anisotropy = 0;
+        mat.anisotropyMap = null;
+      }
+      return;
+    }
+
+    // 3. Disable Draco-unsupported anisotropy and sheen on all other materials
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.anisotropy = 0;
+      mat.anisotropyMap = null;
+      mat.sheen = 0;
+      if (mat.sheenColor) mat.sheenColor.set("#000000");
+      mat.sheenColorMap = null;
+      mat.sheenRoughnessMap = null;
+      mat.specularIntensity = Math.min(mat.specularIntensity, 0.5);
+    }
+
+    // 4. DoubleSide for carbon fiber aero panels, trim, and mirrors
+    if (m.includes("carbon") || m === "gloss-black") {
+      mat.side = DoubleSide;
+    }
+
+    // 5. Keep all original GLTF textures, maps, normal maps, roughness/metalness for tires, carbon fiber, etc.
+    return;
+  }
+
+  // 1. Unassigned primitives (`material: undefined` in GLTF) & white caliper pins
+  if (m === "" || m === "white.002") {
+    mat.color.set("#222226");
+    mat.metalness = 0.85;
+    mat.roughness = 0.25;
+    return;
+  }
+
+  // 2. Red taillight lenses (including empty "Red car lights glass.001" on Porsche 911)
+  if (
+    m === "red car lights glass.001" ||
+    m === "red-g" ||
+    m === "red-g.001" ||
+    m === "backlight glass" ||
+    m === " tail lights.001" ||
+    m.includes("tail lights") ||
+    m.includes("taillight")
+  ) {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#aa0808");
+    mat.transparent = true;
+    mat.opacity = 0.58;
+    mat.roughness = 0.06;
+    mat.metalness = 0.1;
+    mat.depthWrite = false;
+    return;
+  }
+
+  // 2b. Porsche 911 rear LED light bar ("tailligt_emired.003") & third brake light ("Material.040")
+  //     Exported from Blender with white emissiveFactor [1,1,1] instead of crimson red.
+  if (m === "tailligt_emired.003" || m === "material.040") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#cc0000");
+    mat.emissive.set("#ff0a0a");
+    mat.emissiveIntensity = 2.0;
+    mat.roughness = 0.15;
+    mat.metalness = 0.1;
+    return;
+  }
+
+  // 2c. Porsche 911 taillight/headlight internal housing ("tailligt.002", "tailligt_head light.001")
+  //     and front bumper marker lights ("tailligt.003")
+  if (m === "tailligt.002" || m === "tailligt_head light.001") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#18080a");
+    mat.roughness = 0.28;
+    mat.metalness = 0.3;
+    return;
+  }
+  if (m === "tailligt.003") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#222226");
+    mat.emissive.set("#ff6600");
+    mat.emissiveIntensity = 0.35;
+    mat.roughness = 0.2;
+    mat.metalness = 0.2;
+    return;
+  }
+
+  // 2d. Porsche 911 rear exhaust pipes ("Material.041") & internal headlight housing ("Car Paint PL.007")
+  if (m === "material.041" || m === "car paint pl.007") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#1e1e22");
+    mat.metalness = 0.85;
+    mat.roughness = 0.28;
+    return;
+  }
+
+  // 3. Clear headlight lenses & internal light covers
+  if (
+    m === "headlight fog.001" ||
+    m === "car windshield glass.001" ||
+    m === "glass.001" ||
+    m === "glass.002" ||
+    m === "headlight_glass" ||
+    m === "headlight" ||
+    m === "lens" ||
+    m === "matt glass"
+  ) {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#1a1a20");
+    mat.transparent = true;
+    mat.opacity = 0.24;
+    mat.roughness = 0.05;
+    mat.metalness = 0.1;
+    mat.depthWrite = false;
+    return;
+  }
+
+  // 4. Opaque black window frit border on Porsche 911
+  if (m === "black window.001") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#0a0a0d");
+    mat.transparent = false;
+    mat.opacity = 1;
+    mat.roughness = 0.2;
+    mat.metalness = 0.1;
+    return;
+  }
+
+  // 5. Cabin windows & windshields
+  if (m.includes("glass") || m.includes("window") || m.includes("windshield")) {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#0d0f14");
+    mat.transparent = true;
+    mat.opacity = 0.32;
+    mat.roughness = 0.05;
+    mat.metalness = 0.2;
+    mat.depthWrite = false;
+    return;
+  }
+
+  // 6. Porsche 911 internal headlight components with missing GLTF PBR blocks
+  if (m === "hardened mrtal.001") {
+    mat.color.set("#18191c");
+    mat.metalness = 0.8;
+    mat.roughness = 0.3;
+    return;
+  }
+  if (m === "material.030" || m === "noise illusion mirror.007") {
+    mat.color.set("#d0d0d8");
+    mat.metalness = 0.95;
+    mat.roughness = 0.1;
+    return;
+  }
+  if (m === "emmi.001") {
+    mat.color.set("#ffffff");
+    mat.emissive.set("#ffffff");
+    mat.emissiveIntensity = 1.5;
+    mat.metalness = 0;
+    mat.roughness = 0.2;
+    return;
+  }
+
+  // 7. Side-view mirror glass (empty `{}` in Porsche 911 GLTF)
+  if (m === "mirrors.001" || m === "mirror") {
+    mat.color.set("#d8d8e0");
+    mat.metalness = 1.0;
+    mat.roughness = 0.02;
+    return;
+  }
+
+  // 8. Porsche 911 lower bumper & side-skirt black plastic trim
+  if (m === "plastic for rim.001" || m === "mesi for rim.001") {
+    mat.color.set("#121215");
+    mat.metalness = 0.1;
+    mat.roughness = 0.4;
+    return;
+  }
+
+  // 9. Carbon fibre & un-UV'd metal meshes with missing baseColorFactor
+  if (m === "carbon fibre.002") {
+    mat.color.set("#18181b");
+    mat.metalness = 0.25;
+    mat.roughness = 0.25;
+    return;
+  }
+  if (m === "metal.006") {
+    mat.color.set("#777780");
+    mat.metalness = 0.85;
+    mat.roughness = 0.25;
+    return;
+  }
+
+  // 10. Rubber tires across all models (R8 omits metallicFactor -> defaults to 1.0;
+  //     Porsche 911 uses baseColorFactor [1,1,1] with a pale grey diffuse map)
+  if (
+    m === "tire05_low" ||
+    m === "tire" ||
+    m === "tire02" ||
+    m.includes("tire") ||
+    m === "material.031" ||
+    m === "material.032"
+  ) {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#1c1c1e");
+    mat.metalness = 0;
+    mat.metalnessMap = null;
+    mat.roughness = 0.75;
+    mat.side = DoubleSide;
+    return;
+  }
+
+  // 11. Brake discs (avoid glowing white untextured rotors)
+  if (m === "disk" || m === "disk.004") {
+    mat.color.set("#55555a");
+    mat.metalness = 0.8;
+    mat.roughness = 0.3;
+    return;
+  }
+
+  // 12. Chrome trim (roughness 0 in GLTF blows out to flat white under studio lighting)
+  if (m === "chrome") {
+    mat.color.set("#b0b0b8");
+    mat.metalness = 0.9;
+    mat.roughness = 0.18;
+    return;
+  }
+
+  // 13. Audi R8 exterior rubber/satin-black trim (roughness 0 + specular > 1.45 in GLTF)
+  if (m === "glossy-rubber" || m === "dark rubber inter") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#141416");
+    mat.metalness = 0.15;
+    mat.roughness = 0.35;
+    return;
+  }
+
+  // 14. Audi R8 & RS8 interior materials omit `metallicFactor` in the GLTF JSON
+  //     (which causes Three.js GLTFLoader to default `metalness` to 1.0 without a metalnessMap).
+  //     Resetting `metalness` to 0 preserves their original GLTF textures and colors.
+  if (
+    m === "seat-mtl" ||
+    m === "dash-mtl.001" ||
+    m === "door-mtl" ||
+    m === "diff-mtl"
+  ) {
+    disableTransmissionAndClampSpecular();
+    mat.metalness = 0.05;
+    return;
+  }
+
+  // 15. Audi RS8 / R8 interior leathers, rubbers and plastics
+  //     Clearcoat on faceted interior meshes causes harsh polygon glare; clamp to soft matte automotive leather.
+  if (
+    m.includes("artificial leather") ||
+    m.includes("dark_rubber") ||
+    m.includes("rubber-rugh") ||
+    m === "black rubber glossy.001" ||
+    m === "blue-rubber"
+  ) {
+    disableTransmissionAndClampSpecular();
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.clearcoat = 0;
+      mat.clearcoatRoughness = 1;
+    }
+    mat.metalness = 0.05;
+    mat.roughness = 0.65;
+    return;
+  }
+
+  // 16. Porsche 911 interior panels and steering wheel rim (`mat_white_grey.001`, `mat_white.002`, `mat_white.003`)
+  //     These had broken UV / metallic-roughness textures that caused a transparent/mirror look.
+  //     Convert to authentic soft dark matte cockpit finish.
+  if (m.startsWith("mat_white")) {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#1c1c20");
+    mat.metalness = 0.05;
+    mat.roughness = 0.65;
+    mat.metalnessMap = null;
+    mat.roughnessMap = null;
+    return;
+  }
+
+  // 17. Porsche 911 luxury leather seats and trim (`leather_white.006`)
+  //     Clamp high specular so light doesn't blow out under studio lighting.
+  if (m.startsWith("leather_white")) {
+    disableTransmissionAndClampSpecular();
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.specularIntensity = 0.25;
+    }
+    mat.roughness = Math.max(mat.roughness, 0.55);
+    return;
+  }
+
+  // 18. Chevrolet Corvette C8 interior leather & cockpit trim
+  if (m.includes("interior-leather")) {
+    disableTransmissionAndClampSpecular();
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.clearcoat = 0;
+      mat.specularIntensity = 0.25;
+    }
+    mat.metalness = 0.05;
+    mat.roughness = Math.max(mat.roughness, 0.6);
+    return;
+  }
+
+  // 19. Chevrolet Corvette C8 & Lamborghini Revuelto lighting & screens
+  if (m === "daylight") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#ffffff");
+    mat.emissive.set("#ffffff");
+    mat.emissiveIntensity = 2.0;
+    mat.roughness = 0.1;
+    mat.metalness = 0.1;
+    return;
+  }
+  if (
+    m === "red color" ||
+    m === "red emission" ||
+    m === "back-light-tex"
+  ) {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#aa0808");
+    mat.emissive.set("#ff1111");
+    mat.emissiveIntensity = 1.8;
+    mat.roughness = 0.15;
+    mat.metalness = 0.1;
+    return;
+  }
+  if (m.includes("screen")) {
+    disableTransmissionAndClampSpecular();
+    mat.roughness = 0.25;
+    mat.metalness = 0.1;
+    mat.emissive.set("#1a202c");
+    mat.emissiveIntensity = 0.6;
+    return;
+  }
+  if (m === "rough-rubber") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#18181b");
+    mat.metalness = 0.05;
+    mat.roughness = 0.7;
+    return;
+  }
+  if (m === "smooth metal") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#787882");
+    mat.metalness = 0.85;
+    mat.roughness = 0.28;
+    return;
+  }
+  if (m === "wheel") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#24252a");
+    mat.metalness = 0.9;
+    mat.roughness = 0.25;
+    return;
+  }
+  if (m === "anisotropic metal") {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#888890");
+    mat.metalness = 0.85;
+    mat.roughness = 0.25;
+    return;
+  }
+  if (m === "leather" || m === "black leather") {
+    disableTransmissionAndClampSpecular();
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.clearcoat = 0;
+      mat.clearcoatRoughness = 1;
+      mat.specularIntensity = 0.25;
+    }
+    mat.metalness = 0.05;
+    mat.roughness = Math.max(mat.roughness, 0.65);
+    return;
+  }
+  if (m.includes("velour_velvet") || m.includes("velvet")) {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#18181c");
+    mat.metalness = 0.05;
+    mat.roughness = 0.85;
+    return;
+  }
+  if (m === "logo 3" || m === "logo front") {
+    disableTransmissionAndClampSpecular();
+    mat.metalness = 0.8;
+    mat.roughness = 0.25;
+    return;
+  }
+}
+
+function classifyMaterial(
+  matName: string,
+  partPath: string,
+  paintMaterials: Set<string>,
+): MaterialCategory {
+  const m = matName.toLowerCase();
+  void partPath;
+
+  // Window frit stays static black
+  if (m === "black window.001") return "other";
+
+  if (
+    m.includes("glass") ||
+    m.includes("window") ||
+    m.includes("windshield") ||
+    m === "headlight fog.001" ||
+    m === "lens"
+  ) {
+    return "glass";
+  }
+
+  // Porsche 911 bumper/skirt black plastic includes the substring "rim"
+  // ("plastic for rim.001", "mesi for rim.001") and internal headlight housing
+  // ("car paint pl.007") includes "paint" — never classify as wheel accent or body paint!
+  if (
+    m === "plastic for rim.001" ||
+    m === "mesi for rim.001" ||
+    m === "car paint pl.007"
+  ) {
+    return "other";
+  }
+
+  if (m.includes("caliper")) return "accent";
+
+  if (paintMaterials.has(m)) {
+    return "paint";
+  }
+  if (
+    (m.includes("paint") && !m.includes("black paint")) ||
+    m.includes("carpaint")
+  ) {
+    return "paint";
+  }
+
+  // Wheel rims & exterior accents
+  if (
+    m === "metal-black" ||
+    m === "redtrim" ||
+    m === "rubber-white"
+  ) {
+    return "accent";
+  }
+
+  return "other";
+}
+
+// ─── Model component ──────────────────────────────────────────────────────────
+
+export function Model({
+  config,
+  onFirstPaint,
+  carRotationRef,
+  isDraggingCarRef,
+}: {
+  config: ConfigState;
+  onFirstPaint?: () => void;
+  carRotationRef?: React.MutableRefObject<number>;
+  isDraggingCarRef?: React.MutableRefObject<boolean>;
+}) {
+  "use no memo";
+  const { gl } = useThree();
+  const wrapperRef = useRef<Group>(null!);
+  const modelInfo =
+    MODELS.find((m) => m.id === config.selectedModel) || MODELS[0];
+
+  const gltfResult = useGLTF(modelInfo.url, undefined, undefined, (loader) =>
+    setupLoaders(loader as GLTFLoader, gl)
+  );
+
+  const { scene, targetScale } = useMemo(() => {
+    const root = gltfResult.scene.clone(true);
+
+    const paintSet = new Set<MeshPhysicalMaterial>();
+    const accentSet = new Set<MeshPhysicalMaterial>();
+    const clonedByOrig = new Map<MeshStandardMaterial, MeshPhysicalMaterial>();
+    const specialClones = new Map<string, MeshPhysicalMaterial>();
+    const extraPaintNames = new Set(
+      (modelInfo.paintMaterials ?? []).map((n) => n.toLowerCase())
+    );
+
+    const getSpecialClone = (
+      key: string,
+      baseMat: MeshPhysicalMaterial,
+      setup: (clone: MeshPhysicalMaterial) => void
+    ): MeshPhysicalMaterial => {
+      let c = specialClones.get(key);
+      if (!c) {
+        c = baseMat.clone();
+        setup(c);
+        specialClones.set(key, c);
+      }
+      return c;
+    };
+
+    const applyMetallicWheelFinish = (mat: MeshPhysicalMaterial) => {
+      mat.metalness = 0.95;
+      mat.roughness = 0.16;
+      mat.clearcoat = 0.6;
+      mat.clearcoatRoughness = 0.1;
+      mat.envMapIntensity = 1.5;
+      mat.specularIntensity = 1.0;
+      mat.specularColor.set("#ffffff");
+      mat.side = DoubleSide;
+      accentSet.add(mat);
+    };
+
+    root.traverse((child) => {
+      if (child instanceof Mesh && child.material) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+
+        const partPath = getPartPath(child, root);
+
+        // Smooth out faceted polygon shading across curved interior and body surfaces
+        // without increasing memory or polygon counts
+        if (
+          child.geometry &&
+          modelInfo.id !== "lamborghini-revuelto" &&
+          (modelInfo.id === "audi-rs8" ||
+            modelInfo.id === "chevrolet-corvette-c8" ||
+            partPath.includes("wheel") ||
+            partPath.includes("dash") ||
+            partPath.includes("seat") ||
+            partPath.includes("steer") ||
+            partPath.includes("inter"))
+        ) {
+          child.geometry.computeVertexNormals();
+        }
+        // Special Case: Lamborghini Revuelto rear air intake grille under the taillight
+        // (`Subdiv#45_symmetric`) has unassigned material in GLTF.
+        // Assign authentic dark satin honeycomb/grille material.
+        if (
+          modelInfo.id === "lamborghini-revuelto" &&
+          (child.name.includes("010") ||
+            child.name.includes("247") ||
+            partPath.includes("010") ||
+            partPath.includes("247") ||
+            partPath.includes("45"))
+        ) {
+          const grilleMat = getSpecialClone("lamborghini-rear-grille", new MeshPhysicalMaterial(), (clone) => {
+            clone.name = "Lamborghini-Rear-Grille";
+            clone.color.set("#161619");
+            clone.roughness = 0.85;
+            clone.metalness = 0.15;
+            clone.clearcoat = 0.0;
+            clone.side = DoubleSide;
+          });
+          child.material = grilleMat;
+          return;
+        }
+
+        const rawMats = Array.isArray(child.material) ? child.material : [child.material];
+        const clonedMats = rawMats.map((m) => {
+          if (m instanceof MeshStandardMaterial) {
+            let mat = clonedByOrig.get(m);
+            if (!mat) {
+              mat = cloneAsPhysicalMaterial(m);
+              fixStaticMaterialDefaults(mat, modelInfo.id);
+              clonedByOrig.set(m, mat);
+            }
+
+            const matNameLower = (mat.name || "").toLowerCase();
+
+            // Special Case A: Porsche 911 wheel rims use "glossy black.013" on wheel
+            // nodes (`flwheel002`, `frwheel002`, `bwheels002`), while body trim also
+            // uses "glossy black.013". Clone it on wheel nodes so "Wheel Finish"
+            // colors all 4 rims without affecting body window/bumper trim.
+            if (
+              matNameLower === "glossy black.013" &&
+              (partPath.includes("wheel") || partPath.includes("bwheels"))
+            ) {
+              return getSpecialClone("porsche-wheel-rim", mat, (clone) => {
+                applyMetallicWheelFinish(clone);
+              });
+            }
+
+            // Special Case B: Audi RS6 `WholeBody` lower splitter/side skirts share
+            // "Rubber-white" with `Rims.001`. Keep `WholeBody` dark satin trim so
+            // wheel finish does not bleed onto the lower body panels.
+            if (
+              matNameLower === "rubber-white" &&
+              partPath.includes("wholebody")
+            ) {
+              return getSpecialClone("rs6-lower-trim", mat, (clone) => {
+                clone.color.set("#141416");
+                clone.metalness = 0.2;
+                clone.roughness = 0.35;
+              });
+            }
+
+            // Special Case C: Audi RS6 `Dashboard` uses "Chrome" on 49k interior
+            // vertices; keep dashboard trim dark brushed aluminum instead of bright chrome.
+            if (
+              matNameLower === "chrome" &&
+              partPath.includes("dashboard")
+            ) {
+              return getSpecialClone("dashboard-dark-chrome", mat, (clone) => {
+                clone.color.set("#28282e");
+                clone.metalness = 0.7;
+                clone.roughness = 0.35;
+              });
+            }
+
+            // Special Case D: Porsche 911 rear emblems (`blogo002` "911 Carrera 4S",
+            // `text001` & `text011` "PORSCHE") use "glossy black.013". Give them a
+            // satin chrome/silver finish so the rear badging is legible.
+            if (
+              matNameLower === "glossy black.013" &&
+              (partPath.includes("blogo") ||
+                partPath.includes("text001") ||
+                partPath.includes("text011"))
+            ) {
+              return getSpecialClone("porsche-rear-emblem", mat, (clone) => {
+                clone.color.set("#d4d8dd");
+                clone.metalness = 0.9;
+                clone.roughness = 0.18;
+              });
+            }
+
+            // Special Case E: Chevrolet Corvette C8 wheel rims use "Black-METAL" on wheel
+            // nodes (`Circle.004`, `Circle.014`). Clone it on wheel nodes so "Wheel Finish"
+            // colors all 4 rims without affecting other trim.
+            if (
+              matNameLower === "black-metal" &&
+              (partPath.includes("circle.004") ||
+                partPath.includes("circle.014") ||
+                partPath.includes("wheel"))
+            ) {
+              return getSpecialClone("corvette-wheel-rim", mat, (clone) => {
+                applyMetallicWheelFinish(clone);
+              });
+            }
+
+            // Special Case F: Lamborghini Revuelto wheel rims use "Smooth Metal" on wheel rim
+            // nodes (`Subdiv#85_symmetric` front, `Subdiv#110_symmetric` rear).
+            // Clone it on wheel nodes so "Wheel Finish" colors all 4 rims without affecting
+            // brake calipers (`Subdiv#94`, `Subdiv#99`) or discs (`Subdiv#86`, `Subdiv#106`).
+            if (
+              modelInfo.id === "lamborghini-revuelto" &&
+              matNameLower === "smooth metal" &&
+              (partPath.includes("004") ||
+                partPath.includes("008") ||
+                partPath.includes("110") ||
+                partPath.includes("85") ||
+                partPath.includes("249") ||
+                partPath.includes("253"))
+            ) {
+              return getSpecialClone("lamborghini-wheel-rim", mat, (clone) => {
+                applyMetallicWheelFinish(clone);
+              });
+            }
+
+            const cat = classifyMaterial(
+              mat.name || "",
+              partPath,
+              extraPaintNames
+            );
+
+            if (cat === "paint") {
+              // If the model shares its body paint material with brake calipers
+              // (e.g. Porsche 911 `Material.022` on `caliper front` and `bwheels`),
+              // give calipers their own clone in `accentSet`.
+              if (
+                partPath.includes("caliper") ||
+                partPath.includes("bwheels")
+              ) {
+                return getSpecialClone(`caliper-${matNameLower}`, mat, (clone) => {
+                  applyMetallicWheelFinish(clone);
+                });
+              }
+              // Realistic automotive metallic paint: metallic flake basecoat + glossy clearcoat lacquer
+              mat.metalness = 0.68;
+              mat.roughness = 0.22;
+              mat.clearcoat = 1.0;
+              mat.clearcoatRoughness = 0.04;
+              mat.envMapIntensity = 1.25;
+              paintSet.add(mat);
+            } else if (cat === "accent") {
+              applyMetallicWheelFinish(mat);
+            }
+
+            return mat;
+          }
+          return m;
+        });
+
+        child.material = Array.isArray(child.material) ? clonedMats : clonedMats[0];
+      }
+    });
+
+    // Rebuild missing halves before computing bounding box and centering
+    if (modelInfo.symmetry) {
+      restoreSymmetry(root, modelInfo.symmetry);
+    }
+
+    // Porsche 911 has multi-primitive groups (`lowerbody002`, `front_glass002`, `doors002`)
+    // where specific child primitives (right side skirt, right headlight DRL/reflector,
+    // right door handle/carbon trim) were exported on +X only. Mirror those leaf meshes across X=0.
+    if (modelInfo.id === "porsche-911") {
+      root.updateMatrixWorld(true);
+      const multiPrimGroups = ["lowerbody002", "front_glass002", "doors002"];
+      const primBox = new Box3();
+      multiPrimGroups.forEach((groupName) => {
+        const grp = root.getObjectByName(groupName);
+        if (!grp) return;
+        [...grp.children].forEach((child) => {
+          if (!(child instanceof Mesh)) return;
+          primBox.setFromObject(child);
+          // In local mesh space of Porsche 911, X=0 is the vehicle centerline
+          child.geometry.computeBoundingBox();
+          const gBox = child.geometry.boundingBox;
+          if (gBox && gBox.min.x >= -0.01 && gBox.max.x > 0.2) {
+            const mirroredMesh = child.clone();
+            mirroredMesh.name = `${child.name}_mirror`;
+            mirroredMesh.scale.x *= -1;
+            grp.add(mirroredMesh);
+          }
+        });
+      });
+    }
+
+    root.rotation.x = modelInfo.rotationX || 0;
+
+    const box = new Box3().setFromObject(root);
+    const center = box.getCenter(new Vector3());
+    const size = box.getSize(new Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = (250 / maxDim) * modelInfo.scale;
+
+    // Center model on ground plane
+    root.position.set(-center.x, -box.min.y, -center.z);
+
+    root.userData.paintMaterials = Array.from(paintSet);
+    root.userData.accentMaterials = Array.from(accentSet);
+
+    return {
+      scene: root,
+      targetScale: scale,
+    };
+  }, [gltfResult, modelInfo]);
+
+  // Target colors for smooth Three.js frame-by-frame lerping
+  const targetPaintColor = useRef(new Color(config.mainColor));
+  const targetAccentColor = useRef(new Color(config.accentColor));
+  const activeModelIdRef = useRef<string | null>(null);
+  const needsImmediateColorSyncRef = useRef(true);
+  const lastAppliedMatteRef = useRef<boolean | null>(null);
+
+  // Update target colors when user picks swatches
+  useEffect(() => {
+    targetPaintColor.current.set(config.mainColor);
+  }, [config.mainColor]);
+
+  useEffect(() => {
+    targetAccentColor.current.set(config.accentColor);
+  }, [config.accentColor]);
+
+  // When switching models, flag immediate sync without mutating local variables in effect
+  useEffect(() => {
+    if (activeModelIdRef.current !== modelInfo.id) {
+      activeModelIdRef.current = modelInfo.id;
+      needsImmediateColorSyncRef.current = true;
+      targetPaintColor.current.set(config.mainColor);
+      targetAccentColor.current.set(config.accentColor);
+    }
+
+    if (onFirstPaint) onFirstPaint();
+  }, [modelInfo.id, config.mainColor, config.accentColor, onFirstPaint]);
+
+  // Reset scale and manual rotation on model switch for grow animation
+  useEffect(() => {
+    if (wrapperRef.current) {
+      wrapperRef.current.scale.set(0, 0, 0);
+    }
+    if (carRotationRef) {
+      carRotationRef.current = 0;
+    }
+  }, [config.selectedModel, carRotationRef]);
+
+  useFrame((state, delta) => {
+    if (!wrapperRef.current) return;
+
+    // Smooth rotation (shortest-path alignment to 0 in interior mode so cockpit camera aligns cleanly)
+    if (config.viewMode === "interior") {
+      let curY = wrapperRef.current.rotation.y % (Math.PI * 2);
+      if (curY > Math.PI) curY -= Math.PI * 2;
+      if (curY < -Math.PI) curY += Math.PI * 2;
+      wrapperRef.current.rotation.y = curY;
+      easing.damp(wrapperRef.current.rotation, "y", 0, 0.2, delta);
+      if (carRotationRef) carRotationRef.current = 0;
+    } else {
+      if (config.isAnimated && !isDraggingCarRef?.current) {
+        wrapperRef.current.rotation.y += delta * 0.15;
+        if (carRotationRef) carRotationRef.current = wrapperRef.current.rotation.y;
+      } else {
+        const targetRotationY = carRotationRef
+          ? carRotationRef.current
+          : config.rotationY;
+        easing.damp(
+          wrapperRef.current.rotation,
+          "y",
+          targetRotationY,
+          0.12,
+          delta,
+        );
+      }
+    }
+
+    // Smooth scale entrance
+    easing.damp(wrapperRef.current.scale, "x", targetScale, 0.2, delta);
+    easing.damp(wrapperRef.current.scale, "y", targetScale, 0.2, delta);
+    easing.damp(wrapperRef.current.scale, "z", targetScale, 0.2, delta);
+
+    const carRoot = wrapperRef.current.children[0];
+    const paintMats = (carRoot?.userData?.paintMaterials || []) as MeshPhysicalMaterial[];
+    const accentMats = (carRoot?.userData?.accentMaterials || []) as MeshPhysicalMaterial[];
+
+    // Immediate initial color sync on model load / switch
+    if (needsImmediateColorSyncRef.current) {
+      needsImmediateColorSyncRef.current = false;
+      for (let i = 0; i < paintMats.length; i++) {
+        paintMats[i].color.copy(targetPaintColor.current);
+        paintMats[i].needsUpdate = true;
+      }
+      for (let i = 0; i < accentMats.length; i++) {
+        accentMats[i].color.copy(targetAccentColor.current);
+        accentMats[i].needsUpdate = true;
+      }
+    }
+
+    // Reactively update matte vs metallic PBR material finish
+    if (lastAppliedMatteRef.current !== config.mattePaint) {
+      lastAppliedMatteRef.current = config.mattePaint ?? false;
+      const isMatte = Boolean(config.mattePaint);
+      for (let i = 0; i < paintMats.length; i++) {
+        const mat = paintMats[i];
+        if (isMatte) {
+          mat.metalness = 0.0;
+          mat.roughness = 0.92;
+          mat.clearcoat = 0.0;
+          mat.envMapIntensity = 0.35;
+        } else {
+          mat.metalness = 0.68;
+          mat.roughness = 0.22;
+          mat.clearcoat = 1.0;
+          mat.clearcoatRoughness = 0.04;
+          mat.envMapIntensity = 1.25;
+        }
+        mat.needsUpdate = true;
+      }
+    }
+
+    // Smooth color lerping transitions using Three.js dampC
+    const colorSmoothTime = 0.28;
+    for (let i = 0; i < paintMats.length; i++) {
+      easing.dampC(
+        paintMats[i].color,
+        targetPaintColor.current,
+        colorSmoothTime,
+        delta,
+      );
+    }
+    for (let i = 0; i < accentMats.length; i++) {
+      easing.dampC(
+        accentMats[i].color,
+        targetAccentColor.current,
+        colorSmoothTime,
+        delta,
+      );
+    }
+  });
+
+  return (
+    <group ref={wrapperRef} scale={0}>
+      <primitive object={scene} dispose={null} />
+    </group>
+  );
+}
+
+// ─── Showroom Environment (Cube interior from ShowRoom.gltf) ──────────────────
+
+// Car_config3 (Porsche 911, 4.52m long) is scaled to 250 scene units (250 / 4.52 ≈ 55.31).
+// In the original Blender scene, the car sits inside the "Cube" showroom directly beneath
+// "Superloop Light 200" at [3.458809, 5.9796085, 13.259531], where Y = 5.9796085 is the
+// exact floor height of the "Cube" mesh.
+const SHOWROOM_SCALE = 55.31;
+const SHOWROOM_OFFSET: [number, number, number] = [
+  -3.458809,
+  -5.9796085,
+  -13.259531,
+];
+
+/**
+ * Generates a tileable matte white architectural plaster/micro-cement diffuse
+ * and bump texture for the "Cube" showroom interior.
+ */
+function createMatteWhiteShowroomTextures(): {
+  diffuseMap: CanvasTexture | null;
+  bumpMap: CanvasTexture | null;
+} {
+  if (typeof document === "undefined") {
+    return { diffuseMap: null, bumpMap: null };
+  }
+
+  const size = 512;
+  const diffCanvas = document.createElement("canvas");
+  diffCanvas.width = size;
+  diffCanvas.height = size;
+  const diffCtx = diffCanvas.getContext("2d");
+
+  const bumpCanvas = document.createElement("canvas");
+  bumpCanvas.width = size;
+  bumpCanvas.height = size;
+  const bumpCtx = bumpCanvas.getContext("2d");
+
+  if (!diffCtx || !bumpCtx) {
+    return { diffuseMap: null, bumpMap: null };
+  }
+
+  const diffImg = diffCtx.createImageData(size, size);
+  const bumpImg = bumpCtx.createImageData(size, size);
+  const dData = diffImg.data;
+  const bData = bumpImg.data;
+
+  // Deterministic pseudo-random generator for clean, seamless-feeling matte grain
+  let seed = 1337;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+
+  for (let y = 0; y < size; y++) {
+    const wy = Math.sin((y / size) * Math.PI * 2);
+    for (let x = 0; x < size; x++) {
+      const wx = Math.cos((x / size) * Math.PI * 2);
+      const idx = (y * size + x) * 4;
+
+      // Subtle multi-frequency plaster/micro-cement variation around mid gray (#80848a)
+      const macro = (wx * wy) * 3.5;
+      const micro = (rand() - 0.5) * 10;
+      const val = Math.max(115, Math.min(145, Math.round(130 + macro + micro)));
+
+      dData[idx] = val;
+      dData[idx + 1] = val + 2;
+      dData[idx + 2] = val + 5;
+      dData[idx + 3] = 255;
+
+      const bVal = Math.max(0, Math.min(255, Math.round(128 + micro * 8)));
+      bData[idx] = bVal;
+      bData[idx + 1] = bVal;
+      bData[idx + 2] = bVal;
+      bData[idx + 3] = 255;
+    }
+  }
+
+  diffCtx.putImageData(diffImg, 0, 0);
+  bumpCtx.putImageData(bumpImg, 0, 0);
+
+  const diffuseMap = new CanvasTexture(diffCanvas);
+  diffuseMap.colorSpace = SRGBColorSpace;
+  diffuseMap.wrapS = RepeatWrapping;
+  diffuseMap.wrapT = RepeatWrapping;
+  diffuseMap.needsUpdate = true;
+
+  const bumpMap = new CanvasTexture(bumpCanvas);
+  bumpMap.wrapS = RepeatWrapping;
+  bumpMap.wrapT = RepeatWrapping;
+  bumpMap.needsUpdate = true;
+
+  return { diffuseMap, bumpMap };
+}
+
+export function Showroom({ lightIntensity }: { lightIntensity: number }) {
+  const { gl } = useThree();
+  const gltfResult = useGLTF(
+    "/cars/ShowRoom.gltf",
+    undefined,
+    undefined,
+    (loader) => setupLoaders(loader as GLTFLoader, gl)
+  );
+  const logoResult = useGLTF(
+    "/cars/KhazCustomsLogo.glb",
+    undefined,
+    undefined,
+    (loader) => setupLoaders(loader as GLTFLoader, gl)
+  );
+
+  const { scene } = useMemo(() => {
+    const root = gltfResult.scene.clone(true);
+    const logoRoot = logoResult.scene.clone(true);
+    const textNode = logoRoot.getObjectByName("Text");
+    if (textNode) {
+      // Mount logo flush onto the left showroom wall, facing into the studio at eye level
+      textNode.quaternion.set(-0.5, -0.5, 0.5, -0.5);
+      textNode.position.set(-6.94, 7.55, 11.4);
+    }
+    root.add(logoRoot);
+
+    const clonedByOrig = new Map<MeshStandardMaterial, MeshPhysicalMaterial>();
+    const emissiveSet = new Set<MeshPhysicalMaterial>();
+    const logoMats: MeshPhysicalMaterial[] = [];
+
+    const { diffuseMap, bumpMap } = createMatteWhiteShowroomTextures();
+
+    // Mid-gray matte textured interior material for the "Cube" showroom mesh.
+    // Rendering `BackSide` flips normals inward for proper interior lighting and
+    // automatically culls exterior walls if the camera orbits outside the room.
+    const cubeInteriorMat = new MeshPhysicalMaterial({
+      name: "ShowroomCubeInterior",
+      color: "#80848a",
+      map: diffuseMap,
+      bumpMap: bumpMap,
+      bumpScale: 0.015,
+      roughness: 0.96,
+      metalness: 0.0,
+      clearcoat: 0.0,
+      specularIntensity: 0.04,
+      envMapIntensity: 0.12,
+      side: BackSide,
+    });
+
+    root.traverse((child) => {
+      const isMeshObj =
+        child instanceof Mesh ||
+        Boolean((child as unknown as { isMesh?: boolean }).isMesh);
+      if (!isMeshObj) return;
+      const mesh = child as Mesh;
+
+      const partPath = getPartPath(mesh, root);
+      const isCubeRoom = mesh.name === "Cube" || partPath.includes("cube");
+      const isCeilingLight = partPath.includes("superloop");
+      const isLogo =
+        mesh.name.toLowerCase().includes("text") ||
+        partPath.toLowerCase().includes("text") ||
+        (mesh.parent && mesh.parent.name.toLowerCase().includes("text"));
+
+      if (isCubeRoom) {
+        // Compute uniform world-scale box-projected UVs on Cube so the matte white
+        // texture tiles evenly across the floor, walls, and ceiling without stretching.
+        const geom = mesh.geometry.clone();
+        const posAttr = geom.getAttribute("position");
+        const normAttr = geom.getAttribute("normal");
+        if (posAttr && normAttr) {
+          const uvs = new Float32Array(posAttr.count * 2);
+          const tileScale = 0.65; // ~1.5m per texture tile in Blender space
+          for (let i = 0; i < posAttr.count; i++) {
+            const px = posAttr.getX(i);
+            const py = posAttr.getY(i);
+            const pz = posAttr.getZ(i);
+            const nx = Math.abs(normAttr.getX(i));
+            const ny = Math.abs(normAttr.getY(i));
+            const nz = Math.abs(normAttr.getZ(i));
+
+            if (ny >= nx && ny >= nz) {
+              uvs[i * 2] = px * tileScale;
+              uvs[i * 2 + 1] = pz * tileScale;
+            } else if (nx >= ny && nx >= nz) {
+              uvs[i * 2] = pz * tileScale;
+              uvs[i * 2 + 1] = py * tileScale;
+            } else {
+              uvs[i * 2] = px * tileScale;
+              uvs[i * 2 + 1] = py * tileScale;
+            }
+          }
+          geom.setAttribute("uv", new BufferAttribute(uvs, 2));
+        }
+        mesh.geometry = geom;
+        mesh.material = cubeInteriorMat;
+        mesh.castShadow = false;
+        mesh.receiveShadow = true;
+        return;
+      }
+
+      mesh.castShadow = !isCeilingLight;
+      mesh.receiveShadow = true;
+
+      const rawMats = Array.isArray(mesh.material)
+        ? mesh.material
+        : [mesh.material];
+      const fixedMats = rawMats.map((m: unknown) => {
+        const isStdMat =
+          m instanceof MeshStandardMaterial ||
+          Boolean((m as unknown as { isMeshStandardMaterial?: boolean })?.isMeshStandardMaterial);
+        if (!isStdMat) return m as MeshStandardMaterial;
+        let mat = clonedByOrig.get(m as MeshStandardMaterial);
+        if (!mat) {
+          mat = cloneAsPhysicalMaterial(m as MeshStandardMaterial);
+          const mName = (mat.name || "").toLowerCase();
+
+          if (isLogo) {
+            // Front illuminated letters of Khaz Customs showroom sign - rich vibrant electric blue (#026dfe)
+            const isFrontLetters =
+              mName === "material" ||
+              mesh.name.toLowerCase().includes("text_1") ||
+              mName.includes("material.000");
+
+            if (isFrontLetters) {
+              mat.color.set("#026dfe");
+              mat.emissive.set("#026dfe");
+              mat.emissiveIntensity = 2.2;
+              mat.roughness = 0.25;
+              mat.metalness = 0.0;
+              logoMats.push(mat);
+            } else {
+              // Sleek matte architectural backing / return of sign
+              mat.color.set("#08080c");
+              mat.roughness = 0.85;
+              mat.metalness = 0.1;
+            }
+          } else if (mName === "wheel brake disk.001") {
+            mat.color.set("#70747a");
+            mat.metalness = 0.85;
+            mat.roughness = 0.28;
+          } else if (mName === "logo") {
+            mat.metalness = 0.15;
+            mat.roughness = 0.25;
+          } else if (mName === "rim") {
+            mat.color.set("#282c32");
+            mat.metalness = 0.9;
+            mat.roughness = 0.22;
+          } else if (mName === "tyre.001" || mName === "side wall.001") {
+            mat.color.set("#18181b");
+            mat.metalness = 0;
+            mat.roughness = 0.72;
+          } else if (mName === "loop_plastic_black_shiny") {
+            mat.color.set("#141416");
+            mat.metalness = 0.15;
+            mat.roughness = 0.2;
+            mat.specularIntensity = 0.5;
+            mat.specularColor.set("#ffffff");
+          } else if (mName === "loop_chrome_brushed") {
+            mat.color.set("#c8ccd0");
+            mat.metalness = 0.9;
+            mat.roughness = 0.2;
+          } else if (mName === "loop_emissive") {
+            mat.color.set("#ffffff");
+            mat.emissive.set("#fff8ee");
+            mat.emissiveIntensity = 3.0;
+            mat.roughness = 0.15;
+            emissiveSet.add(mat);
+          }
+
+          clonedByOrig.set(m as MeshStandardMaterial, mat);
+        }
+        return mat;
+      });
+
+      mesh.material = Array.isArray(mesh.material)
+        ? fixedMats
+        : fixedMats[0];
+    });
+
+    root.position.set(...SHOWROOM_OFFSET);
+    root.userData.logoMaterials = logoMats;
+    root.userData.emissiveMaterials = Array.from(emissiveSet);
+    return {
+      scene: root,
+    };
+  }, [gltfResult, logoResult]);
+
+  const deepBlueLogoColor = useMemo(() => new Color("#0035b8"), []);
+  const neonBlueLogoColor = useMemo(() => new Color("#1e8aff"), []);
+  const currentLogoColor = useMemo(() => new Color("#026dfe"), []);
+  const showroomGroupRef = useRef<Group>(null);
+  const logoLightRef = useRef<PointLight>(null);
+  const logoCarWashRef = useRef<PointLight>(null);
+  const logoSpotRef = useRef<SpotLight>(null);
+
+  useFrame((state, delta) => {
+    const targetEmissive = lightIntensity * 2.5;
+    const showroomRoot = showroomGroupRef.current?.children[0];
+
+    const emissiveMats = (showroomRoot?.userData?.emissiveMaterials as MeshPhysicalMaterial[]) || [];
+    for (let i = 0; i < emissiveMats.length; i++) {
+      easing.damp(emissiveMats[i], "emissiveIntensity", targetEmissive, 0.2, delta);
+    }
+
+    // Slower, graceful pulsation cycle (~6 seconds)
+    const rawSine = Math.sin(state.clock.elapsedTime * 1.05);
+    const pulseFactor = (rawSine + 1) * 0.5; // 0 to 1
+    // Breathe between rich deep royal blue and brilliant neon electric blue (always vibrant blue!)
+    currentLogoColor.lerpColors(deepBlueLogoColor, neonBlueLogoColor, pulseFactor);
+
+    // Controlled emissive power for the letters - keeps blue deeply saturated without blowing out to white
+    const dynamicLogoEmissive = 2.0 + pulseFactor * 0.8;
+
+    const logoMats = (showroomRoot?.userData?.logoMaterials as MeshPhysicalMaterial[]) || [];
+    for (let i = 0; i < logoMats.length; i++) {
+      const mat = logoMats[i];
+      mat.color.copy(currentLogoColor);
+      mat.emissive.copy(currentLogoColor);
+      easing.damp(mat, "emissiveIntensity", dynamicLogoEmissive, 0.2, delta);
+    }
+
+    if (logoLightRef.current) {
+      logoLightRef.current.color.copy(currentLogoColor);
+      easing.damp(
+        logoLightRef.current,
+        "intensity",
+        (lightIntensity * 6.0 + 12.0) * (0.8 + pulseFactor * 0.4),
+        0.2,
+        delta
+      );
+    }
+
+    if (logoSpotRef.current) {
+      logoSpotRef.current.color.copy(currentLogoColor);
+      logoSpotRef.current.target.position.set(0, 15, 0);
+      logoSpotRef.current.target.updateMatrixWorld();
+      easing.damp(
+        logoSpotRef.current,
+        "intensity",
+        (lightIntensity * 5.0 + 8.0) * (0.8 + pulseFactor * 0.4),
+        0.2,
+        delta
+      );
+    }
+
+    if (logoCarWashRef.current) {
+      logoCarWashRef.current.color.copy(currentLogoColor);
+      easing.damp(
+        logoCarWashRef.current,
+        "intensity",
+        (lightIntensity * 3.5 + 4.0) * (0.8 + pulseFactor * 0.4),
+        0.2,
+        delta
+      );
+    }
+  });
+
+  return (
+    <>
+      <group ref={showroomGroupRef} scale={SHOWROOM_SCALE}>
+        <primitive object={scene} dispose={null} />
+      </group>
+
+      {/* Wall bloom around the sign letters (world coords: logo is at x = -575, y = 87, z = -103) */}
+      <pointLight
+        ref={logoLightRef}
+        position={[-545, 87, -103]}
+        distance={350}
+        decay={1.0}
+        intensity={20.0}
+        color="#026dfe"
+      />
+
+      {/* Direct focused spotlight cast from the wall sign across the room onto the car */}
+      <spotLight
+        ref={logoSpotRef}
+        position={[-545, 95, -103]}
+        angle={0.42}
+        penumbra={0.8}
+        decay={0}
+        intensity={14.0}
+        color="#026dfe"
+      />
+
+      {/* Direct vibrant blue wash cast onto the car driver-side doors, wheels, and hood */}
+      <pointLight
+        ref={logoCarWashRef}
+        position={[-140, 50, -30]}
+        distance={320}
+        decay={0.8}
+        intensity={8.0}
+        color="#026dfe"
+      />
+    </>
+  );
+}
