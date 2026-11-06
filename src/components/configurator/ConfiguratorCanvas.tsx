@@ -379,7 +379,7 @@ function SceneContent({
         maxPolarAngle={
           config.viewMode === "exterior" ? Math.PI / 2 - 0.02 : Math.PI - 0.05
         }
-        enablePan={config.viewMode !== "interior"}
+        enablePan={false}
         enableZoom={false}
         enableRotate={config.viewMode === "interior"}
         onStart={() => {
@@ -389,22 +389,20 @@ function SceneContent({
         onEnd={() => {
           isUserInteracting.current = false;
         }}
-        touches={{
-          ONE:
-            config.viewMode === "interior"
-              ? THREE.TOUCH.ROTATE
-              : THREE.TOUCH.PAN,
-          TWO: THREE.TOUCH.ROTATE,
-        }}
+        touches={
+          config.viewMode === "interior"
+            ? {
+                ONE: THREE.TOUCH.ROTATE,
+                TWO: THREE.TOUCH.ROTATE,
+              }
+            : undefined
+        }
         mouseButtons={
           config.viewMode === "interior"
             ? {
                 LEFT: THREE.MOUSE.ROTATE,
-                RIGHT: THREE.MOUSE.PAN,
               }
-            : {
-                RIGHT: THREE.MOUSE.PAN,
-              }
+            : {}
         }
       />
 
@@ -548,7 +546,7 @@ export default function ConfiguratorCanvas({
 
   return (
     <div
-      className={`relative w-full h-full ${
+      className={`relative w-full h-full touch-none select-none ${
         canDragRotateCar ? "cursor-grab active:cursor-grabbing" : ""
       }`}
       onPointerDown={handlePointerDown}
