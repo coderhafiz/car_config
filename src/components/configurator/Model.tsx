@@ -94,6 +94,7 @@ export interface ModelInfo {
   type: string;
   scale: number;
   rotationX?: number;
+  rotationY?: number;
   parts: ModelPart[];
   materialType: string;
   /** Camera node name from GLTF used for interior view */
@@ -203,6 +204,7 @@ export const MODELS: ModelInfo[] = [
     type: "gltf",
     scale: 1,
     rotationX: 0,
+    rotationY: -Math.PI / 2,
     accentColor: "#7A8088",
     parts: [
       { id: "WholeBody", name: "Body" },
@@ -234,8 +236,8 @@ export const MODELS: ModelInfo[] = [
       label: "Exterior",
     },
     interiorCamera: {
-      position: [24.8, 59.5, 2.4],
-      target: [-32.7, 42.9, -1.2],
+      position: [2.4, 59.5, -24.8],
+      target: [-1.2, 42.9, 32.7],
       label: "Interior",
     },
   },
@@ -251,6 +253,7 @@ export const MODELS: ModelInfo[] = [
     type: "gltf",
     scale: 1,
     rotationX: 0,
+    rotationY: -Math.PI / 2,
     accentColor: "#D4D8DD",
     parts: [
       { id: "Body", name: "Body" },
@@ -281,8 +284,8 @@ export const MODELS: ModelInfo[] = [
       label: "Exterior",
     },
     interiorCamera: {
-      position: [12.8, 55.6, -6.7],
-      target: [-43.8, 39.7, 5],
+      position: [-6.7, 55.6, -12.8],
+      target: [5, 39.7, 43.8],
       label: "Interior",
     },
   },
@@ -931,10 +934,10 @@ function fixStaticMaterialDefaults(
     m === "material.032"
   ) {
     disableTransmissionAndClampSpecular();
-    mat.color.set("#1c1c1e");
+    mat.color.set("#121214");
     mat.metalness = 0;
     mat.metalnessMap = null;
-    mat.roughness = 0.75;
+    mat.roughness = 0.88;
     mat.side = DoubleSide;
     return;
   }
@@ -1450,6 +1453,7 @@ export function Model({
     }
 
     root.rotation.x = modelInfo.rotationX || 0;
+    root.rotation.y = modelInfo.rotationY || 0;
 
     const box = new Box3().setFromObject(root);
     const center = box.getCenter(new Vector3());
@@ -1914,12 +1918,11 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
   const currentLogoColor = useMemo(() => new Color("#026dfe"), []);
   const showroomGroupRef = useRef<Group>(null);
   const logoLightRef = useRef<PointLight>(null);
-  const logoCarWashRef = useRef<PointLight>(null);
   const logoSpotRef = useRef<SpotLight>(null);
 
   useEffect(() => {
     if (logoSpotRef.current) {
-      logoSpotRef.current.target.position.set(0, 15, 0);
+      logoSpotRef.current.target.position.set(0, 35, 0);
       logoSpotRef.current.target.updateMatrixWorld();
     }
   }, []);
@@ -1957,7 +1960,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
       easing.damp(
         logoLightRef.current,
         "intensity",
-        (lightIntensity * 6.0 + 12.0) * (0.8 + pulseFactor * 0.4),
+        (lightIntensity * 4.0 + 6.0) * (0.8 + pulseFactor * 0.4),
         0.2,
         delta
       );
@@ -1968,18 +1971,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
       easing.damp(
         logoSpotRef.current,
         "intensity",
-        (lightIntensity * 5.0 + 8.0) * (0.8 + pulseFactor * 0.4),
-        0.2,
-        delta
-      );
-    }
-
-    if (logoCarWashRef.current) {
-      logoCarWashRef.current.color.copy(currentLogoColor);
-      easing.damp(
-        logoCarWashRef.current,
-        "intensity",
-        (lightIntensity * 3.5 + 4.0) * (0.8 + pulseFactor * 0.4),
+        (lightIntensity * 1.5 + 2.0) * (0.8 + pulseFactor * 0.4),
         0.2,
         delta
       );
@@ -1996,30 +1988,20 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
       <pointLight
         ref={logoLightRef}
         position={[-545, 87, -103]}
-        distance={350}
-        decay={1.0}
-        intensity={20.0}
+        distance={280}
+        decay={1.2}
+        intensity={10.0}
         color="#026dfe"
       />
 
-      {/* Direct focused spotlight cast from the wall sign across the room onto the car */}
+      {/* Subtle atmospheric blue spotlight cast from the wall sign across the room onto the car */}
       <spotLight
         ref={logoSpotRef}
         position={[-545, 95, -103]}
-        angle={0.42}
-        penumbra={0.8}
-        decay={0}
-        intensity={14.0}
-        color="#026dfe"
-      />
-
-      {/* Direct vibrant blue wash cast onto the car driver-side doors, wheels, and hood */}
-      <pointLight
-        ref={logoCarWashRef}
-        position={[-140, 50, -30]}
-        distance={320}
-        decay={0.8}
-        intensity={8.0}
+        angle={0.45}
+        penumbra={1.0}
+        decay={1.8}
+        intensity={3.5}
         color="#026dfe"
       />
     </>
