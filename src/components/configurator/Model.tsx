@@ -204,7 +204,7 @@ export const MODELS: ModelInfo[] = [
     type: "gltf",
     scale: 1,
     rotationX: 0,
-    rotationY: -Math.PI / 2,
+    rotationY: Math.PI / 2,
     accentColor: "#7A8088",
     parts: [
       { id: "WholeBody", name: "Body" },
@@ -253,7 +253,7 @@ export const MODELS: ModelInfo[] = [
     type: "gltf",
     scale: 1,
     rotationX: 0,
-    rotationY: -Math.PI / 2,
+    rotationY: Math.PI / 2,
     accentColor: "#D4D8DD",
     parts: [
       { id: "Body", name: "Body" },
