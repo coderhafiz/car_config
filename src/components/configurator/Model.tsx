@@ -436,6 +436,7 @@ export function preloadCarModel(url: string) {
   useGLTF.preload(url, undefined, undefined, (loader) => {
     // Uses the singleton Draco / KTX2 / Meshopt decoders
     (loader as GLTFLoader).setDRACOLoader(getDracoLoader());
+    if (ktx2Loader) (loader as GLTFLoader).setKTX2Loader(ktx2Loader);
     (loader as GLTFLoader).setMeshoptDecoder(MeshoptDecoder);
   });
 }
