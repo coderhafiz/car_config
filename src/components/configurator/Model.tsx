@@ -1918,11 +1918,12 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
   const currentLogoColor = useMemo(() => new Color("#026dfe"), []);
   const showroomGroupRef = useRef<Group>(null);
   const logoLightRef = useRef<PointLight>(null);
+  const logoCarWashRef = useRef<PointLight>(null);
   const logoSpotRef = useRef<SpotLight>(null);
 
   useEffect(() => {
     if (logoSpotRef.current) {
-      logoSpotRef.current.target.position.set(0, 35, 0);
+      logoSpotRef.current.target.position.set(0, 15, 0);
       logoSpotRef.current.target.updateMatrixWorld();
     }
   }, []);
@@ -1960,7 +1961,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
       easing.damp(
         logoLightRef.current,
         "intensity",
-        (lightIntensity * 4.0 + 6.0) * (0.8 + pulseFactor * 0.4),
+        (lightIntensity * 6.0 + 12.0) * (0.8 + pulseFactor * 0.4),
         0.2,
         delta
       );
@@ -1971,7 +1972,18 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
       easing.damp(
         logoSpotRef.current,
         "intensity",
-        (lightIntensity * 1.5 + 2.0) * (0.8 + pulseFactor * 0.4),
+        (lightIntensity * 5.0 + 8.0) * (0.8 + pulseFactor * 0.4),
+        0.2,
+        delta
+      );
+    }
+
+    if (logoCarWashRef.current) {
+      logoCarWashRef.current.color.copy(currentLogoColor);
+      easing.damp(
+        logoCarWashRef.current,
+        "intensity",
+        (lightIntensity * 3.5 + 4.0) * (0.8 + pulseFactor * 0.4),
         0.2,
         delta
       );
@@ -1988,20 +2000,30 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
       <pointLight
         ref={logoLightRef}
         position={[-545, 87, -103]}
-        distance={280}
-        decay={1.2}
-        intensity={10.0}
+        distance={350}
+        decay={1.0}
+        intensity={20.0}
         color="#026dfe"
       />
 
-      {/* Subtle atmospheric blue spotlight cast from the wall sign across the room onto the car */}
+      {/* Direct focused spotlight cast from the wall sign across the room onto the car */}
       <spotLight
         ref={logoSpotRef}
         position={[-545, 95, -103]}
-        angle={0.45}
-        penumbra={1.0}
-        decay={1.8}
-        intensity={3.5}
+        angle={0.42}
+        penumbra={0.8}
+        decay={0}
+        intensity={14.0}
+        color="#026dfe"
+      />
+
+      {/* Direct vibrant blue wash cast onto the car driver-side doors, wheels, and hood */}
+      <pointLight
+        ref={logoCarWashRef}
+        position={[-140, 50, -30]}
+        distance={320}
+        decay={0.8}
+        intensity={8.0}
         color="#026dfe"
       />
     </>
