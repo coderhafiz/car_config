@@ -258,7 +258,7 @@ function SceneContent({
       easing.damp(ambientLightRef.current, "intensity", targetAmbient, 0.25, delta);
     }
     if (interiorFillRef.current) {
-      const targetFill = isInterior ? config.lightIntensity * 2.2 : 0;
+      const targetFill = isInterior ? config.lightIntensity * 1.35 : 0;
       if (Math.abs(interiorFillRef.current.intensity - targetFill) > 0.005) {
         easing.damp(interiorFillRef.current, "intensity", targetFill, 0.25, delta);
       }
@@ -463,7 +463,7 @@ function SceneContent({
         ref={interiorFillRef}
         position={[0, 52, 4]}
         color="#fffbf6"
-        decay={0.2}
+        decay={1.0}
         distance={140}
         intensity={0}
         visible={config.viewMode === "interior"}

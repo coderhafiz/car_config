@@ -1001,16 +1001,76 @@ function fixStaticMaterialDefaults(
     return;
   }
 
-  // 16. Porsche 911 interior panels and steering wheel rim (`mat_white_grey.001`, `mat_white.002`, `mat_white.003`)
-  //     These had broken UV / metallic-roughness textures that caused a transparent/mirror look.
-  //     Convert to authentic soft dark matte cockpit finish.
-  if (m.startsWith("mat_white")) {
+  // 16. Porsche 911 interior: steering wheel rim, cockpit dashboard, cabin panels & console trim
+  //     In the original GLTF asset (`Car_config3.glb`), the 3D model author mapped these materials
+  //     (`mat.014`, `mat.017`, `mat.015`, `mat.010`, `mat_white.002`, `mat_white.003`, `mat_white_grey.001`)
+  //     with `MN_chrome_dirt.jpg` as the baseColorTexture and `MN_Dust_3.jpg` as the roughness map.
+  //     This caused the steering wheel and dashboard to reflect studio lights like crumpled tin foil / mirror chrome.
+  //     Convert them to authentic Porsche 992 soft-touch matte Nappa leather, Race-Tex, and satin cockpit trim.
+  if (
+    m === "mat.014" ||
+    m === "mat.015" ||
+    m === "mat.010" ||
+    m === "mat.017" ||
+    m.startsWith("mat_white")
+  ) {
     disableTransmissionAndClampSpecular();
-    mat.color.set("#1c1c20");
-    mat.metalness = 0.05;
-    mat.roughness = 0.65;
-    mat.metalnessMap = null;
+    mat.map = null;
+    mat.normalMap = null;
     mat.roughnessMap = null;
+    mat.metalnessMap = null;
+    mat.metalness = 0.0;
+    mat.roughness = m === "mat.014" ? 0.82 : 0.85;
+    mat.color.set(m === "mat.014" ? "#18181b" : "#1c1c20");
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.clearcoat = 0.0;
+      mat.clearcoatRoughness = 1.0;
+      mat.specularIntensity = 0.2;
+    }
+    return;
+  }
+
+  // 16b. Porsche 911 steering wheel spokes, hub surround, and interior metal trim
+  if (m === "metal.009" || m === "metal.008") {
+    disableTransmissionAndClampSpecular();
+    mat.map = null;
+    mat.normalMap = null;
+    mat.roughnessMap = null;
+    mat.metalnessMap = null;
+    if (m === "metal.009") {
+      // Steering wheel spokes & hub bezel: satin dark anodized aluminum (not raw mirror chrome)
+      mat.color.set("#24252a");
+      mat.metalness = 0.55;
+      mat.roughness = 0.55;
+    } else {
+      // Interior door/pedal metal trim (`metal.008`): dark gunmetal satin finish
+      mat.color.set("#2c2d32");
+      mat.metalness = 0.65;
+      mat.roughness = 0.45;
+    }
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.clearcoat = 0.0;
+      mat.clearcoatRoughness = 1.0;
+      mat.specularIntensity = 0.3;
+    }
+    return;
+  }
+
+  // 16c. Porsche 911 paddle shifters & cockpit switchgear
+  if (
+    m === "glossy black.016" ||
+    m === "mat.011" ||
+    m === "mat.012" ||
+    m === "mat.013"
+  ) {
+    disableTransmissionAndClampSpecular();
+    mat.color.set("#161618");
+    mat.metalness = 0.1;
+    mat.roughness = 0.55;
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.clearcoat = 0.0;
+      mat.specularIntensity = 0.25;
+    }
     return;
   }
 
@@ -1252,6 +1312,7 @@ export function Model({
           modelInfo.id !== "lamborghini-revuelto" &&
           (modelInfo.id === "audi-rs8" ||
             modelInfo.id === "chevrolet-corvette-c8" ||
+            modelInfo.id === "porsche-911" ||
             partPath.includes("wheel") ||
             partPath.includes("dash") ||
             partPath.includes("seat") ||
