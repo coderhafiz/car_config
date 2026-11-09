@@ -70,6 +70,7 @@ export default function Home() {
       viewMode: "exterior",
       selectedTexture: "leather",
       mattePaint: false,
+      selectedShowroom: "showroom-1",
     };
   });
 
@@ -134,7 +135,7 @@ export default function Home() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "My Khaz Customs Configuration",
+          title: "My customly-U Configuration",
           text: `Check out this ${selectedModelInfo.name} I configured!`,
           url,
         });
@@ -222,10 +223,10 @@ export default function Home() {
           >
             <div className="flex items-center">
               <h1
-                className="text-lg lg:text-xl font-bold uppercase tracking-[0.22em] text-white"
-                style={{ fontFamily: "var(--font-open-sans), 'Open Sans', sans-serif" }}
+                className="text-lg lg:text-xl font-normal tracking-[0.16em] text-white"
+                style={{ fontFamily: "'Drason', var(--font-open-sans), sans-serif" }}
               >
-                KHAZ <span className="font-light text-white">CUSTOMS</span>
+                customly-<span className="text-brand-primary">U</span>
               </h1>
             </div>
           </motion.div>

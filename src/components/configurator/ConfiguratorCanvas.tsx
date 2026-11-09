@@ -217,6 +217,9 @@ function SceneContent({
   const { gl } = useThree();
 
   useEffect(() => {
+    const renderer = gl as THREE.WebGLRenderer;
+    renderer.toneMapping = THREE.AgXToneMapping;
+    renderer.toneMappingExposure = 1.25;
     gl.shadowMap.autoUpdate = false;
     gl.shadowMap.needsUpdate = true;
     return () => {
@@ -437,7 +440,10 @@ function SceneContent({
       />
 
       <Suspense fallback={<CanvasLoader hidden={isInitialLoading} />}>
-        <Showroom lightIntensity={config.lightIntensity} />
+        <Showroom
+          lightIntensity={config.lightIntensity}
+          selectedShowroom={config.selectedShowroom}
+        />
         <Model
           config={config}
           onFirstPaint={onLoaded}
@@ -514,6 +520,8 @@ export default function ConfiguratorCanvas({
           powerPreference: "high-performance",
           stencil: false,
           depth: true,
+          toneMapping: THREE.AgXToneMapping,
+          toneMappingExposure: 1.25,
         }}
         dpr={dpr}
         className="w-full h-full"

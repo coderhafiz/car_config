@@ -24,7 +24,7 @@ export default function Loader({ progress = 0 }: { progress?: number }) {
           />
           {/* Center logo */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-brand-primary font-black text-lg">K</span>
+            <span className="text-brand-primary font-normal text-lg" style={{ fontFamily: "'Drason', sans-serif" }}>C</span>
           </div>
         </div>
 
@@ -34,8 +34,11 @@ export default function Loader({ progress = 0 }: { progress?: number }) {
           transition={{ delay: 0.2 }}
           className="mt-8 text-center"
         >
-          <h2 className="text-sm font-bold tracking-[0.25em] text-text-main uppercase">
-            Khaz Customs
+          <h2
+            className="text-sm font-normal tracking-[0.2em] text-text-main"
+            style={{ fontFamily: "'Drason', var(--font-outfit), sans-serif" }}
+          >
+            customly-U
           </h2>
           <div className="mt-4 w-48 h-1 bg-(--glass-border) rounded-full overflow-hidden">
             <motion.div

@@ -25,7 +25,6 @@ import {
   BufferAttribute,
   Color,
   PointLight,
-  SpotLight,
   Cache,
 } from "three";
 import { DRACOLoader, KTX2Loader, GLTFLoader } from "three-stdlib";
@@ -50,6 +49,8 @@ export interface ConfigState {
   selectedTexture: string;
   /** True when the selected exterior paint is a matte finish */
   mattePaint: boolean;
+  /** Selected 3D showroom environment */
+  selectedShowroom?: "showroom-1" | "showroom-2";
 }
 
 export const TEXTURES = [
@@ -151,7 +152,7 @@ export const MODELS: ModelInfo[] = [
     brand: "Audi",
     year: 2023,
     description:
-      "Bespoke Khaz styling program featuring carbon aerodynamic styling, custom caliper detailing, and signature bespoke coachwork finish.",
+      "Bespoke customly-U styling program featuring carbon aerodynamic styling, custom caliper detailing, and signature bespoke coachwork finish.",
     price: 158900,
     url: "/cars/Car_config.glb",
     type: "glb",
@@ -373,7 +374,7 @@ export const MODELS: ModelInfo[] = [
     brand: "Lamborghini",
     year: 2024,
     description:
-      "Flagship V12 HPEV hybrid hypercar featuring an aeronautics-inspired carbon monofuselage, active aerodynamics, and bespoke Khaz coachwork finish.",
+      "Flagship V12 HPEV hybrid hypercar featuring an aeronautics-inspired carbon monofuselage, active aerodynamics, and bespoke customly-U coachwork finish.",
     price: 608358,
     url: "/cars/lamboghini_1.glb",
     type: "glb",
@@ -412,7 +413,7 @@ let dracoLoader: DRACOLoader | null = null;
 let ktx2Loader: KTX2Loader | null = null;
 let persistentCacheInitialized = false;
 
-const ASSET_CACHE_NAME = "khaz-customs-3d-assets-v4";
+const ASSET_CACHE_NAME = "customly-u-3d-assets-v4";
 const CACHEABLE_ASSET_PREFIXES = ["/cars/", "/draco/", "/basis/", "/hdri/", "/textures/"];
 const inFlightAssetFetches = new Map<string, Promise<Response>>();
 
@@ -439,7 +440,7 @@ function ensurePersistentAssetCache() {
   }
 
   // Also wrap window.fetch so even the very first visit (before the Service Worker claims the tab)
-  // reads from and writes to CacheStorage ("khaz-customs-3d-assets-v2")
+  // reads from and writes to CacheStorage ("customly-u-3d-assets-v1")
   if ("caches" in window && typeof window.fetch === "function") {
     const originalFetch = window.fetch.bind(window);
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -584,7 +585,10 @@ export function PreloadModels() {
     useGLTF.preload("/cars/ShowRoom.glb", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
-    useGLTF.preload("/cars/KhazCustomsLogo.glb", "/draco/", true, (loader) =>
+    useGLTF.preload("/cars/ShowRoom2.glb", "/draco/", true, (loader) =>
+      setupLoaders(loader as GLTFLoader, gl)
+    );
+    useGLTF.preload("/cars/CustomlyULogo.glb", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
     useGLTF.preload(MODELS[0].url, "/draco/", true, (loader) =>
@@ -1069,7 +1073,8 @@ function fixStaticMaterialDefaults(
   }
 
   // 10. Rubber tires across all models (R8 omits metallicFactor -> defaults to 1.0;
-  //     Porsche 911 uses baseColorFactor [1,1,1] with a pale grey diffuse map)
+  //     Porsche 911 uses baseColorFactor [1,1,1] with a pale grey diffuse map and
+  //     a 1-channel grayscale image plugged into normalTexture on TEXCOORD_1/2)
   if (
     m === "tire05_low" ||
     m === "tire" ||
@@ -1079,11 +1084,33 @@ function fixStaticMaterialDefaults(
     m === "material.032"
   ) {
     disableTransmissionAndClampSpecular();
-    mat.color.set("#121214");
-    mat.metalness = 0;
+    mat.map = null;
+    mat.normalMap = null;
+    mat.roughnessMap = null;
     mat.metalnessMap = null;
-    mat.roughness = 0.88;
+    mat.bumpMap = null;
+    mat.color.set("#141416");
+    mat.metalness = 0;
+    mat.roughness = 0.85;
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.specularIntensity = 0.15;
+      mat.specularColor.set("#ffffff");
+    }
     mat.side = DoubleSide;
+    return;
+  }
+
+  // 10b. Porsche 911 front bumper radiator behind louvers (untextured bright grey/white in GLTF)
+  if (m === "radiator.001" || m === "radiator2.001" || m.includes("radiator")) {
+    disableTransmissionAndClampSpecular();
+    mat.map = null;
+    mat.normalMap = null;
+    mat.color.set("#161618");
+    mat.metalness = 0.35;
+    mat.roughness = 0.55;
+    if (mat instanceof MeshPhysicalMaterial) {
+      mat.specularIntensity = 0.2;
+    }
     return;
   }
 
@@ -1488,22 +1515,20 @@ function mergeCarMeshesByMaterial(root: Object3D) {
 
     // If the material uses textures, ensure the mesh actually has a uv attribute
     if (usesTextures && !geom.attributes.uv) return;
+    // Skip merging meshes that have secondary UV channels or extra vertex color channels
+    if (geom.attributes.uv1 || geom.attributes.uv2 || geom.attributes.color_1) return;
 
     const posAttr = geom.attributes.position;
     // Keep large high-poly body/wheel meshes zero-copy in their Draco-decoded GPU buffers;
     // only CPU-merge small multi-part detail primitives (screws, vents, needles, trim <= 4,000 verts)
     if (posAttr.count > 4000) return;
     const uvAttr = usesTextures ? geom.attributes.uv : null;
-    const uv1Attr = usesUv1 ? geom.attributes.uv1 : null;
 
     const attrSig = [
       `pos:${posAttr.itemSize}:${posAttr.normalized ? 1 : 0}:${posAttr.array.constructor.name}`,
       uvAttr
         ? `uv:${uvAttr.itemSize}:${uvAttr.normalized ? 1 : 0}:${uvAttr.array.constructor.name}`
         : "nouv",
-      uv1Attr
-        ? `uv1:${uv1Attr.itemSize}:${uv1Attr.normalized ? 1 : 0}:${uv1Attr.array.constructor.name}`
-        : "nouv1",
     ].join("|");
 
     const key = `${mat.uuid}|${child.castShadow ? 1 : 0}|${child.receiveShadow ? 1 : 0}|${attrSig}`;
@@ -1693,9 +1718,10 @@ export function Model({
 
         const partPath = getPartPath(child, root);
 
-        // Strip Blender vertex color ID masks (COLOR_0) so they never tint KTX2 textures or materials
-        if (child.geometry && child.geometry.attributes.color) {
-          child.geometry.deleteAttribute("color");
+        // Strip Blender vertex color ID masks (COLOR_0 / COLOR_1) so they never tint KTX2 textures or materials
+        if (child.geometry) {
+          if (child.geometry.attributes.color) child.geometry.deleteAttribute("color");
+          if (child.geometry.attributes.color_1) child.geometry.deleteAttribute("color_1");
         }
 
         // Only compute vertex normals if the GLB primitive is missing a NORMAL attribute
@@ -2031,11 +2057,41 @@ export function Model({
     targetAccentColor.current.set(config.accentColor);
   }, [config.accentColor]);
 
+  // Immediately apply matte vs metallic PBR finish whenever mattePaint, mainColor, or scene changes
+  useEffect(() => {
+    const isMatte = Boolean(config.mattePaint);
+    lastAppliedMatteRef.current = isMatte;
+    targetPaintColor.current.set(config.mainColor);
+    const paintMats = (scene?.userData?.paintMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
+    for (let i = 0; i < paintMats.length; i++) {
+      const mat = paintMats[i];
+      if (isMatte) {
+        mat.metalness = 0.0;
+        mat.roughness = 0.9;
+        mat.clearcoat = 0.0;
+        mat.clearcoatRoughness = 0.0;
+        mat.specularIntensity = 0.12;
+        mat.envMapIntensity = 0.3;
+        mat.metalnessMap = null;
+        mat.roughnessMap = null;
+      } else {
+        mat.metalness = 0.68;
+        mat.roughness = 0.22;
+        mat.clearcoat = 1.0;
+        mat.clearcoatRoughness = 0.04;
+        mat.specularIntensity = 1.0;
+        mat.envMapIntensity = 1.25;
+      }
+      mat.needsUpdate = true;
+    }
+  }, [scene, config.mattePaint, config.mainColor, config.selectedModel]);
+
   // When switching models, flag immediate sync without mutating local variables in effect
   useEffect(() => {
     if (activeModelIdRef.current !== modelInfo.id) {
       activeModelIdRef.current = modelInfo.id;
       needsImmediateColorSyncRef.current = true;
+      lastAppliedMatteRef.current = null;
       targetPaintColor.current.set(config.mainColor);
       targetAccentColor.current.set(config.accentColor);
     }
@@ -2124,21 +2180,26 @@ export function Model({
         const mat = paintMats[i];
         if (isMatte) {
           mat.metalness = 0.0;
-          mat.roughness = 0.92;
+          mat.roughness = 0.9;
           mat.clearcoat = 0.0;
-          mat.envMapIntensity = 0.35;
+          mat.clearcoatRoughness = 0.0;
+          mat.specularIntensity = 0.12;
+          mat.envMapIntensity = 0.3;
+          mat.metalnessMap = null;
+          mat.roughnessMap = null;
         } else {
           mat.metalness = 0.68;
           mat.roughness = 0.22;
           mat.clearcoat = 1.0;
           mat.clearcoatRoughness = 0.04;
+          mat.specularIntensity = 1.0;
           mat.envMapIntensity = 1.25;
         }
         mat.needsUpdate = true;
       }
     }
 
-    // Smooth color lerping transitions using Three.js dampC (only active while transitioning)
+    // Smooth color lerping transitions using Three.js dampC (uses 1e-8 threshold so dark linear-sRGB swatches never stall)
     if (paintMats.length > 0) {
       const pColor = paintMats[0].color;
       const tColor = targetPaintColor.current;
@@ -2146,8 +2207,8 @@ export function Model({
         (pColor.r - tColor.r) ** 2 +
         (pColor.g - tColor.g) ** 2 +
         (pColor.b - tColor.b) ** 2;
-      if (diffSq > 0.00005) {
-        const colorSmoothTime = 0.28;
+      if (diffSq > 1e-8) {
+        const colorSmoothTime = 0.2;
         for (let i = 0; i < paintMats.length; i++) {
           easing.dampC(
             paintMats[i].color,
@@ -2155,6 +2216,10 @@ export function Model({
             colorSmoothTime,
             delta,
           );
+        }
+      } else if (diffSq > 0) {
+        for (let i = 0; i < paintMats.length; i++) {
+          paintMats[i].color.copy(tColor);
         }
       }
     }
@@ -2165,8 +2230,8 @@ export function Model({
         (aColor.r - tColor.r) ** 2 +
         (aColor.g - tColor.g) ** 2 +
         (aColor.b - tColor.b) ** 2;
-      if (diffSq > 0.00005) {
-        const colorSmoothTime = 0.28;
+      if (diffSq > 1e-8) {
+        const colorSmoothTime = 0.2;
         for (let i = 0; i < accentMats.length; i++) {
           easing.dampC(
             accentMats[i].color,
@@ -2174,6 +2239,10 @@ export function Model({
             colorSmoothTime,
             delta,
           );
+        }
+      } else if (diffSq > 0) {
+        for (let i = 0; i < accentMats.length; i++) {
+          accentMats[i].color.copy(tColor);
         }
       }
     }
@@ -2240,22 +2309,19 @@ function createMatteWhiteShowroomTextures(): {
   };
 
   for (let y = 0; y < size; y++) {
-    const wy = Math.sin((y / size) * Math.PI * 2);
     for (let x = 0; x < size; x++) {
-      const wx = Math.cos((x / size) * Math.PI * 2);
       const idx = (y * size + x) * 4;
 
-      // Subtle multi-frequency plaster/micro-cement variation around mid gray (#80848a)
-      const macro = (wx * wy) * 3.5;
-      const micro = (rand() - 0.5) * 10;
-      const val = Math.max(115, Math.min(145, Math.round(130 + macro + micro)));
+      // Uniform fine-grain matte architectural finish around mid gray (#80848a) with zero tiling wave
+      const micro = (rand() - 0.5) * 4;
+      const val = Math.max(124, Math.min(136, Math.round(130 + micro)));
 
       dData[idx] = val;
       dData[idx + 1] = val + 2;
       dData[idx + 2] = val + 5;
       dData[idx + 3] = 255;
 
-      const bVal = Math.max(0, Math.min(255, Math.round(128 + micro * 8)));
+      const bVal = Math.max(0, Math.min(255, Math.round(128 + micro * 4)));
       bData[idx] = bVal;
       bData[idx + 1] = bVal;
       bData[idx + 2] = bVal;
@@ -2280,16 +2346,25 @@ function createMatteWhiteShowroomTextures(): {
   return { diffuseMap, bumpMap };
 }
 
-export function Showroom({ lightIntensity }: { lightIntensity: number }) {
+export function Showroom({
+  lightIntensity,
+  selectedShowroom = "showroom-1",
+}: {
+  lightIntensity: number;
+  selectedShowroom?: "showroom-1" | "showroom-2";
+}) {
   const { gl } = useThree();
+  const isShowroom2 = selectedShowroom === "showroom-2";
+  const showroomUrl = isShowroom2 ? "/cars/ShowRoom2.glb" : "/cars/ShowRoom.glb";
+
   const gltfResult = useGLTF(
-    "/cars/ShowRoom.glb",
+    showroomUrl,
     "/draco/",
     true,
     (loader) => setupLoaders(loader as GLTFLoader, gl)
   );
   const logoResult = useGLTF(
-    "/cars/KhazCustomsLogo.glb",
+    "/cars/CustomlyULogo.glb",
     "/draco/",
     true,
     (loader) => setupLoaders(loader as GLTFLoader, gl)
@@ -2298,11 +2373,18 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
   const { scene } = useMemo(() => {
     const root = gltfResult.scene.clone(true);
     const logoRoot = logoResult.scene.clone(true);
-    const textNode = logoRoot.getObjectByName("Text");
+    const textNode = logoRoot.getObjectByName("Text") || logoRoot.children[0];
     if (textNode) {
-      // Mount logo flush onto the left showroom wall, facing into the studio at eye level
+      // Mount Cars/CUSTOMLY LOGO.glb flush onto the left showroom wall, facing into the studio at eye level.
+      // Local bounds of CUSTOMLY LOGO.glb: X in [0.01, 8.50] (width 8.49), Y in [-0.184, 0], Z in [-0.517, 0].
       textNode.quaternion.set(-0.5, -0.5, 0.5, -0.5);
-      textNode.position.set(-6.94, 7.55, 11.4);
+      if (isShowroom2) {
+        textNode.scale.setScalar(0.795);
+        textNode.position.set(-13.22, 2.22, -5.75);
+      } else {
+        textNode.scale.setScalar(0.62);
+        textNode.position.set(-6.94, 7.71, 8.76);
+      }
     }
     root.add(logoRoot);
 
@@ -2337,8 +2419,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
       const mesh = child as Mesh;
 
       const partPath = getPartPath(mesh, root);
-      const isCubeRoom = mesh.name === "Cube" || partPath.includes("cube");
-      const isCeilingLight = partPath.includes("superloop");
+      const isCubeRoom = !isShowroom2 && (mesh.name === "Cube" || partPath.includes("cube"));
       const isLogo =
         mesh.name.toLowerCase().includes("text") ||
         partPath.toLowerCase().includes("text") ||
@@ -2381,10 +2462,15 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
         return;
       }
 
-      void isCeilingLight;
-      // Background showroom props (plant, wall wheel, sign) do not need to be drawn into the car spotlight shadow map
+      // Showroom 2 floor (Plane.002) receives the car shadow
+      const isShowroom2Floor =
+        isShowroom2 &&
+        (mesh.name.toLowerCase().includes("plane.002") ||
+          mesh.name.toLowerCase().includes("plane002") ||
+          partPath.includes("plane002"));
+
       mesh.castShadow = false;
-      mesh.receiveShadow = false;
+      mesh.receiveShadow = isShowroom2Floor;
 
       const rawMats = Array.isArray(mesh.material)
         ? mesh.material
@@ -2400,11 +2486,13 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
           const mName = (mat.name || "").toLowerCase();
 
           if (isLogo) {
-            // Front illuminated letters of Khaz Customs showroom sign - rich vibrant electric blue (#026dfe)
+            // Front illuminated letters of CUSTOMLY LOGO.glb (Material.001) - rich vibrant electric blue (#026dfe)
             const isFrontLetters =
+              mName === "material.001" ||
               mName === "material" ||
               mesh.name.toLowerCase().includes("text_1") ||
-              mName.includes("material.000");
+              mName.includes("material.000") ||
+              rawMats.length === 1;
 
             if (isFrontLetters) {
               mat.color.set("#026dfe");
@@ -2418,6 +2506,42 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
               mat.color.set("#08080c");
               mat.roughness = 0.85;
               mat.metalness = 0.1;
+            }
+          } else if (isShowroom2) {
+            // Showroom 2 materials: Light (ceiling panels), Metallic Dark Grey (ceiling louver grid), Wall, Material.006 (floor)
+            if (mName === "light") {
+              mat.transmission = 0;
+              mat.transparent = false;
+              mat.depthWrite = true;
+              mat.color.set("#ffffff");
+              mat.emissive.set("#fff8ee");
+              mat.emissiveIntensity = 2.6;
+              mat.roughness = 0.15;
+              mat.metalness = 0.0;
+              emissiveSet.add(mat);
+            } else if (mName === "metallic dark grey") {
+              mat.color.set("#1c1e22");
+              mat.metalness = 0.82;
+              mat.roughness = 0.28;
+            } else if (mName === "wall") {
+              mat.color.set("#5a5e66");
+              mat.map = diffuseMap;
+              mat.bumpMap = bumpMap;
+              mat.bumpScale = 0.012;
+              mat.metalness = 0.04;
+              mat.roughness = 0.92;
+              mat.specularIntensity = 0.06;
+              mat.envMapIntensity = 0.15;
+            } else if (mName === "material.006") {
+              mat.color.set("#444850");
+              mat.map = diffuseMap;
+              mat.bumpMap = bumpMap;
+              mat.bumpScale = 0.01;
+              mat.metalness = 0.04;
+              mat.roughness = 0.88;
+              mat.specularIntensity = 0.08;
+              mat.envMapIntensity = 0.18;
+              mesh.receiveShadow = true;
             }
           } else if (mName === "wheel brake disk.001") {
             mat.color.set("#70747a");
@@ -2462,28 +2586,25 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
         : fixedMats[0];
     });
 
-    root.position.set(...SHOWROOM_OFFSET);
+    if (isShowroom2) {
+      root.scale.setScalar(0.78);
+      root.position.set(0, -0.00881025 * 0.78, 0);
+    } else {
+      root.scale.setScalar(1);
+      root.position.set(...SHOWROOM_OFFSET);
+    }
     root.userData.logoMaterials = logoMats;
     root.userData.emissiveMaterials = Array.from(emissiveSet);
     return {
       scene: root,
     };
-  }, [gltfResult, logoResult]);
+  }, [gltfResult, logoResult, isShowroom2]);
 
   const deepBlueLogoColor = useMemo(() => new Color("#0035b8"), []);
   const neonBlueLogoColor = useMemo(() => new Color("#1e8aff"), []);
   const currentLogoColor = useMemo(() => new Color("#026dfe"), []);
   const showroomGroupRef = useRef<Group>(null);
   const logoLightRef = useRef<PointLight>(null);
-  const logoCarWashRef = useRef<PointLight>(null);
-  const logoSpotRef = useRef<SpotLight>(null);
-
-  useEffect(() => {
-    if (logoSpotRef.current) {
-      logoSpotRef.current.target.position.set(0, 15, 0);
-      logoSpotRef.current.target.updateMatrixWorld();
-    }
-  }, []);
 
   useFrame((state, delta) => {
     const targetEmissive = lightIntensity * 2.5;
@@ -2518,29 +2639,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
       easing.damp(
         logoLightRef.current,
         "intensity",
-        (lightIntensity * 6.0 + 12.0) * (0.8 + pulseFactor * 0.4),
-        0.2,
-        delta
-      );
-    }
-
-    if (logoSpotRef.current) {
-      logoSpotRef.current.color.copy(currentLogoColor);
-      easing.damp(
-        logoSpotRef.current,
-        "intensity",
-        (lightIntensity * 5.0 + 8.0) * (0.8 + pulseFactor * 0.4),
-        0.2,
-        delta
-      );
-    }
-
-    if (logoCarWashRef.current) {
-      logoCarWashRef.current.color.copy(currentLogoColor);
-      easing.damp(
-        logoCarWashRef.current,
-        "intensity",
-        (lightIntensity * 3.5 + 4.0) * (0.8 + pulseFactor * 0.4),
+        (lightIntensity * 3.5 + 6.0) * (0.8 + pulseFactor * 0.4),
         0.2,
         delta
       );
@@ -2553,34 +2652,13 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
         <primitive object={scene} dispose={null} />
       </group>
 
-      {/* Wall bloom around the sign letters (world coords: logo is at x = -575, y = 87, z = -103) */}
+      {/* Localized wall bloom around the sign letters (world coords: logo is at x = -575, y = 87, z = -103) */}
       <pointLight
         ref={logoLightRef}
         position={[-545, 87, -103]}
-        distance={350}
-        decay={1.0}
-        intensity={20.0}
-        color="#026dfe"
-      />
-
-      {/* Direct focused spotlight cast from the wall sign across the room onto the car */}
-      <spotLight
-        ref={logoSpotRef}
-        position={[-545, 95, -103]}
-        angle={0.42}
-        penumbra={0.8}
-        decay={0}
-        intensity={14.0}
-        color="#026dfe"
-      />
-
-      {/* Direct vibrant blue wash cast onto the car driver-side doors, wheels, and hood */}
-      <pointLight
-        ref={logoCarWashRef}
-        position={[-140, 50, -30]}
-        distance={320}
-        decay={0.8}
-        intensity={8.0}
+        distance={210}
+        decay={1.8}
+        intensity={10.0}
         color="#026dfe"
       />
     </>

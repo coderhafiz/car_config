@@ -14,7 +14,7 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Khaz Customs | 3D Car Configurator",
+  title: "customly-U | 3D Car Configurator",
   description:
     "Configure your dream car in real-time 3D. Customize body colors, interior, wheels and more for Audi R8, RS6, RS8 Sport and Porsche 911.",
 };

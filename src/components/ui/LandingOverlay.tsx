@@ -66,8 +66,11 @@ export default function LandingOverlay({ onEnter }: LandingOverlayProps) {
               className="mb-6 sm:mb-8"
             >
               <div className="flex items-center justify-center mb-4">
-                <h1 className="text-4xl sm:text-7xl font-black tracking-tighter landscape-optimized-landing-title">
-                  KHAZ <span className="text-brand-primary">CUSTOMS</span>
+                <h1
+                  className="text-3xl sm:text-6xl font-normal tracking-wider landscape-optimized-landing-title"
+                  style={{ fontFamily: "'Drason', var(--font-outfit), sans-serif" }}
+                >
+                  customly-<span className="text-brand-primary">U</span>
                 </h1>
               </div>
               <p className="text-xs sm:text-sm font-bold text-text-muted uppercase tracking-[0.4em] mt-2 landscape-optimized-landing-subtitle">

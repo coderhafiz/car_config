@@ -1,8 +1,8 @@
-# Khaz Customs - 3D Real-Time Car Configurator
+# customly-U - 3D Real-Time Car Configurator
 
-An interactive, high-performance 3D automobile configurator built with **Next.js 15**, **React Three Fiber (Three.js)**, **Tailwind CSS**, and **Framer Motion** for **Khaz Customs**.
+An interactive, high-performance 3D automobile configurator built with **Next.js 15**, **React Three Fiber (Three.js)**, **Tailwind CSS**, and **Framer Motion** for **customly-U**.
 
-![Khaz Customs Studio Configurator](public/og-image.png)
+![customly-U Studio Configurator](public/og-image.png)
 
 ---
 
@@ -18,7 +18,7 @@ An interactive, high-performance 3D automobile configurator built with **Next.js
 
 - **Photorealistic Architectural Showroom**:
   - Procedural micro-cement showroom interior with realistic diffuse and bump textures.
-  - 3D channel-letter illuminated **Khaz Customs** wall logo pulsating in electric blue (`#026dfe`).
+  - 3D channel-letter illuminated **customly-U** wall logo pulsating in electric blue (`#026dfe`).
   - Dynamic directional studio wash lights and spotlights that cast real-time blue illumination and specular highlights onto the vehicle.
   - Realistic overhead Superloop ring light and contact ground shadows.
 
@@ -80,4 +80,4 @@ npm run start
 
 ## 📄 License
 
-Proprietary © Khaz Customs. All rights reserved.
+Proprietary © customly-U. All rights reserved.

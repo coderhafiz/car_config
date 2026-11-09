@@ -1,4 +1,4 @@
-const CACHE_PREFIX = "khaz-customs-3d-assets-";
+const CACHE_PREFIX = "customly-u-3d-assets-";
 const CACHE_NAME = `${CACHE_PREFIX}v4`;
 
 const CRITICAL_DECODERS = [

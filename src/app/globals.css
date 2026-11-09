@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Drason";
+  src: url("/fonts/Drason.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
   --font-logo: var(--font-open-sans), "Open Sans", ui-sans-serif, sans-serif;
@@ -16,7 +24,7 @@
 
 :root {
   color-scheme: dark;
-  /* Brand palette: signature vibrant Khaz blue #026dfe */
+  /* Brand palette: signature vibrant customly-U blue #026dfe */
   --brand-primary: #026dfe;
   --brand-secondary: #d16b54;
   /* Dark Theme */
