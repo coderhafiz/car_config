@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   turbopack: {},
-  // Long-term immutable caching for static 3D assets, decoders & textures
+  // Long-term immutable caching for static 3D assets, decoders, HDRIs & textures
   async headers() {
     return [
       {
@@ -25,6 +25,15 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/basis/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/hdri/:path*",
         headers: [
           {
             key: "Cache-Control",

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "khaz-customs-3d-assets-";
-const CACHE_NAME = `${CACHE_PREFIX}v3`;
+const CACHE_NAME = `${CACHE_PREFIX}v4`;
 
 const CRITICAL_DECODERS = [
   "/draco/draco_decoder.js",
@@ -9,7 +9,13 @@ const CRITICAL_DECODERS = [
   "/basis/basis_transcoder.wasm",
 ];
 
-const CACHEABLE_PATH_PREFIXES = ["/cars/", "/draco/", "/basis/", "/textures/"];
+const CACHEABLE_PATH_PREFIXES = [
+  "/cars/",
+  "/draco/",
+  "/basis/",
+  "/hdri/",
+  "/textures/",
+];
 
 // Deduplicate concurrent network fetches for the same 3D model URL
 const inFlightRequests = new Map();

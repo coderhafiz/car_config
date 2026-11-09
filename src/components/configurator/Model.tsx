@@ -412,8 +412,8 @@ let dracoLoader: DRACOLoader | null = null;
 let ktx2Loader: KTX2Loader | null = null;
 let persistentCacheInitialized = false;
 
-const ASSET_CACHE_NAME = "khaz-customs-3d-assets-v3";
-const CACHEABLE_ASSET_PREFIXES = ["/cars/", "/draco/", "/basis/", "/textures/"];
+const ASSET_CACHE_NAME = "khaz-customs-3d-assets-v4";
+const CACHEABLE_ASSET_PREFIXES = ["/cars/", "/draco/", "/basis/", "/hdri/", "/textures/"];
 const inFlightAssetFetches = new Map<string, Promise<Response>>();
 
 /**
@@ -561,11 +561,27 @@ export function PreloadModels() {
     const isIOS =
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-    if (isSafari || isIOS) return;
+    const isMobileDevice =
+      isSafari ||
+      isIOS ||
+      window.innerWidth < 768 ||
+      /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      navigator.maxTouchPoints > 1;
+    const navConn = (navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }).connection;
+    const isDataConstrained = Boolean(
+      navConn?.saveData ||
+        navConn?.effectiveType === "slow-2g" ||
+        navConn?.effectiveType === "2g" ||
+        navConn?.effectiveType === "3g"
+    );
+
+    if (isMobileDevice || isDataConstrained) return;
 
     // 1. High-priority preload: Showroom + initial default car (Audi R8)
     //    Gets 100% of browser connections without network contention
-    useGLTF.preload("/cars/ShowRoom.gltf", "/draco/", true, (loader) =>
+    useGLTF.preload("/cars/ShowRoom.glb", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
     useGLTF.preload("/cars/KhazCustomsLogo.glb", "/draco/", true, (loader) =>
@@ -819,6 +835,10 @@ function fixStaticMaterialDefaults(
       mat.specularColor.set("#ffffff");
     }
   };
+
+  // Unconditionally disable real-time screen-space refraction (transmission > 0)
+  // so WebGLRenderer never allocates or renders a second full-scene transmission pass
+  disableTransmissionAndClampSpecular();
 
   // Lamborghini Revuelto: preserve authored PBR textures (carbon fiber, tire maps, leathers, screens, metallic trim)
   if (modelId === "lamborghini-revuelto") {
@@ -1999,6 +2019,8 @@ export function Model({
   const activeModelIdRef = useRef<string | null>(null);
   const needsImmediateColorSyncRef = useRef(true);
   const lastAppliedMatteRef = useRef<boolean | null>(null);
+  const lastShadowRotYRef = useRef<number>(NaN);
+  const lastShadowScaleRef = useRef<number>(NaN);
 
   // Update target colors when user picks swatches
   useEffect(() => {
@@ -2065,6 +2087,18 @@ export function Model({
       easing.damp(wrapperRef.current.scale, "x", targetScale, 0.2, delta);
       easing.damp(wrapperRef.current.scale, "y", targetScale, 0.2, delta);
       easing.damp(wrapperRef.current.scale, "z", targetScale, 0.2, delta);
+    }
+
+    // Only re-render the spotlight shadow map when the car's rotation or scale changes
+    const curRotY = wrapperRef.current.rotation.y;
+    const curScale = wrapperRef.current.scale.x;
+    if (
+      Math.abs(curRotY - lastShadowRotYRef.current) > 0.0008 ||
+      Math.abs(curScale - lastShadowScaleRef.current) > 0.002
+    ) {
+      lastShadowRotYRef.current = curRotY;
+      lastShadowScaleRef.current = curScale;
+      state.gl.shadowMap.needsUpdate = true;
     }
 
     const carRoot = wrapperRef.current.children[0];
@@ -2249,7 +2283,7 @@ function createMatteWhiteShowroomTextures(): {
 export function Showroom({ lightIntensity }: { lightIntensity: number }) {
   const { gl } = useThree();
   const gltfResult = useGLTF(
-    "/cars/ShowRoom.gltf",
+    "/cars/ShowRoom.glb",
     "/draco/",
     true,
     (loader) => setupLoaders(loader as GLTFLoader, gl)
@@ -2347,8 +2381,10 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
         return;
       }
 
-      mesh.castShadow = !isCeilingLight;
-      mesh.receiveShadow = true;
+      void isCeilingLight;
+      // Background showroom props (plant, wall wheel, sign) do not need to be drawn into the car spotlight shadow map
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
 
       const rawMats = Array.isArray(mesh.material)
         ? mesh.material

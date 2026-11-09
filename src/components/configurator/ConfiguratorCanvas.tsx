@@ -214,12 +214,23 @@ function SceneContent({
   const ambientLightRef = useRef<THREE.AmbientLight>(null!);
   const interiorFillRef = useRef<THREE.PointLight>(null!);
 
+  const { gl } = useThree();
+
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = true;
+    return () => {
+      gl.shadowMap.autoUpdate = true;
+    };
+  }, [gl]);
+
   useEffect(() => {
     if (superloopSpotRef.current) superloopSpotRef.current.intensity = 0;
     if (superloopCenterRef.current) superloopCenterRef.current.intensity = 0;
     if (ambientLightRef.current) ambientLightRef.current.intensity = 0;
     if (interiorFillRef.current) interiorFillRef.current.intensity = 0;
-  }, [config.selectedModel]);
+    gl.shadowMap.needsUpdate = true;
+  }, [config.selectedModel, gl]);
 
   useFrame((state, delta) => {
     const isInterior = config.viewMode === "interior";
@@ -402,7 +413,7 @@ function SceneContent({
         intensity={config.lightIntensity * 1.1}
         color="#fffaf2"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={isMobile ? [1024, 1024] : [2048, 2048]}
         shadow-bias={-0.0004}
       />
 
@@ -447,7 +458,12 @@ export default function ConfiguratorCanvas({
   const carRotationRef = useRef(config.rotationY);
   const isDraggingCarRef = useRef(false);
   const lastPointerXRef = useRef(0);
-  const [dpr, setDpr] = useState(1.5);
+  const [isMobileViewport] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      (window.innerWidth < 768 || navigator.maxTouchPoints > 1)
+  );
+  const [dpr, setDpr] = useState(() => (isMobileViewport ? 1.15 : 1.5));
 
   const canDragRotateCar = config.viewMode === "exterior";
 
@@ -505,8 +521,8 @@ export default function ConfiguratorCanvas({
         <PreloadModels />
         <PreloadTextures />
         <PerformanceMonitor
-          onDecline={() => setDpr(1)}
-          onIncline={() => setDpr(1.5)}
+          onDecline={() => setDpr(isMobileViewport ? 0.9 : 1.0)}
+          onIncline={() => setDpr(isMobileViewport ? 1.2 : 1.5)}
         />
 
         <Suspense fallback={null}>
