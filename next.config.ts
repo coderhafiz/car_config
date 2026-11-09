@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   turbopack: {},
-  // Long-term immutable caching for static 3D assets & textures
+  // Long-term immutable caching for static 3D assets, decoders & textures
   async headers() {
     return [
       {
@@ -16,6 +16,15 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/draco/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/basis/:path*",
         headers: [
           {
             key: "Cache-Control",

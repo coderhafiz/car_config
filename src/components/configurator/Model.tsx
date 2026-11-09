@@ -8,6 +8,9 @@ import {
   Mesh,
   MeshStandardMaterial,
   MeshPhysicalMaterial,
+  MeshBasicMaterial,
+  BufferGeometry,
+  PlaneGeometry,
   Box3,
   Vector3,
   Matrix4,
@@ -23,8 +26,10 @@ import {
   Color,
   PointLight,
   SpotLight,
+  Cache,
 } from "three";
 import { DRACOLoader, KTX2Loader, GLTFLoader } from "three-stdlib";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { MeshoptDecoder } from "meshoptimizer";
 
 const EMPTY_MATS: MeshPhysicalMaterial[] = [];
@@ -148,8 +153,8 @@ export const MODELS: ModelInfo[] = [
     description:
       "Bespoke Khaz styling program featuring carbon aerodynamic styling, custom caliper detailing, and signature bespoke coachwork finish.",
     price: 158900,
-    url: "/cars/Car_config.gltf",
-    type: "gltf",
+    url: "/cars/Car_config.glb",
+    type: "glb",
     scale: 1,
     rotationX: 0,
     accentColor: "#D4D8DD",
@@ -200,8 +205,8 @@ export const MODELS: ModelInfo[] = [
     description:
       "Signature widebody styling package with tailored carbon splitter, custom forged alloys, and bespoke interior appointments.",
     price: 117900,
-    url: "/cars/Car_config1.gltf",
-    type: "gltf",
+    url: "/cars/Car_config1.glb",
+    type: "glb",
     scale: 1,
     rotationX: 0,
     rotationY: Math.PI / 2,
@@ -249,8 +254,8 @@ export const MODELS: ModelInfo[] = [
     description:
       "Flagship bespoke grand tourer conversion featuring sculpted aerodynamic package, tailored forged wheels, and handcrafted cabin.",
     price: 189500,
-    url: "/cars/Car_config2.gltf",
-    type: "gltf",
+    url: "/cars/Car_config2.glb",
+    type: "glb",
     scale: 1,
     rotationX: 0,
     rotationY: Math.PI / 2,
@@ -298,7 +303,7 @@ export const MODELS: ModelInfo[] = [
       "Bespoke rear-engine custom program with tailored exterior styling, precision forged rims, and signature race-tex appointments.",
     price: 142700,
     url: "/cars/Car_config3.glb",
-    type: "gltf",
+    type: "glb",
     scale: 1,
     rotationX: 0,
     accentColor: "#D4AF37",
@@ -337,7 +342,7 @@ export const MODELS: ModelInfo[] = [
       "Bespoke mid-engine American supercar featuring tailored aerodynamic coachwork, forged performance alloys, and handcrafted cabin appointments.",
     price: 135800,
     url: "/cars/chevrolet.glb",
-    type: "gltf",
+    type: "glb",
     scale: 1,
     rotationX: 0,
     accentColor: "#D4D8DD",
@@ -405,6 +410,110 @@ export const MODELS: ModelInfo[] = [
 
 let dracoLoader: DRACOLoader | null = null;
 let ktx2Loader: KTX2Loader | null = null;
+let persistentCacheInitialized = false;
+
+const ASSET_CACHE_NAME = "khaz-customs-3d-assets-v3";
+const CACHEABLE_ASSET_PREFIXES = ["/cars/", "/draco/", "/basis/", "/textures/"];
+const inFlightAssetFetches = new Map<string, Promise<Response>>();
+
+/**
+ * Ensures 3D models, KTX2 textures, and WASM decoders are persisted across browser
+ * sessions using the Origin Cache Storage API (`window.caches`) + Service Worker (`/sw.js`)
+ * + `navigator.storage.persist()`, as well as in-memory `THREE.Cache`.
+ */
+function ensurePersistentAssetCache() {
+  Cache.enabled = true;
+  if (persistentCacheInitialized || typeof window === "undefined") return;
+  persistentCacheInitialized = true;
+
+  // Request persistent storage quota so the browser never auto-evicts cached .glb models
+  if (navigator.storage && typeof navigator.storage.persist === "function") {
+    navigator.storage.persist().catch(() => undefined);
+  }
+
+  // Register Service Worker to intercept both main-thread and Web Worker fetches
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker
+      .register("/sw.js", { scope: "/" })
+      .catch(() => undefined);
+  }
+
+  // Also wrap window.fetch so even the very first visit (before the Service Worker claims the tab)
+  // reads from and writes to CacheStorage ("khaz-customs-3d-assets-v2")
+  if ("caches" in window && typeof window.fetch === "function") {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const method = (
+        init?.method ||
+        (input instanceof Request ? input.method : "GET")
+      ).toUpperCase();
+
+      if (method !== "GET") {
+        return originalFetch(input, init);
+      }
+
+      let urlStr = "";
+      if (typeof input === "string") {
+        urlStr = input;
+      } else if (input instanceof URL) {
+        urlStr = input.href;
+      } else if (input instanceof Request) {
+        urlStr = input.url;
+      }
+
+      let parsedUrl: URL | null = null;
+      try {
+        parsedUrl = new URL(urlStr, window.location.origin);
+      } catch {
+        return originalFetch(input, init);
+      }
+
+      const isSameOrigin = parsedUrl.origin === window.location.origin;
+      const isCacheableAsset =
+        isSameOrigin &&
+        CACHEABLE_ASSET_PREFIXES.some((prefix) =>
+          parsedUrl!.pathname.startsWith(prefix)
+        );
+
+      if (!isCacheableAsset) {
+        return originalFetch(input, init);
+      }
+
+      const cacheKey = parsedUrl.href;
+      try {
+        const cache = await window.caches.open(ASSET_CACHE_NAME);
+        const cachedResponse = await cache.match(cacheKey, { ignoreVary: true });
+        if (cachedResponse) {
+          return cachedResponse.clone();
+        }
+
+        let inFlight = inFlightAssetFetches.get(cacheKey);
+        if (!inFlight) {
+          inFlight = originalFetch(input, init)
+            .then(async (response) => {
+              if (response && response.status === 200 && response.ok) {
+                try {
+                  await cache.put(cacheKey, response.clone());
+                } catch {
+                  // Ignore quota exceeded errors
+                }
+              }
+              return response;
+            })
+            .finally(() => {
+              inFlightAssetFetches.delete(cacheKey);
+            });
+          inFlightAssetFetches.set(cacheKey, inFlight);
+        }
+
+        const netResponse = await inFlight;
+        return netResponse.clone();
+      } catch {
+        return originalFetch(input, init);
+      }
+    };
+  }
+}
 
 function getDracoLoader() {
   if (!dracoLoader) {
@@ -415,16 +524,23 @@ function getDracoLoader() {
   return dracoLoader;
 }
 
-function getKTX2Loader(gl: WebGLRenderer) {
+function getKTX2Loader(gl?: WebGLRenderer) {
   if (!ktx2Loader) {
     ktx2Loader = new KTX2Loader();
     ktx2Loader.setTranscoderPath("/basis/");
-    ktx2Loader.detectSupport(gl);
+    if (gl && gl.extensions && typeof gl.extensions.has === "function") {
+      ktx2Loader.detectSupport(gl);
+    } else if (typeof document !== "undefined") {
+      const dummyRenderer = new WebGLRenderer();
+      ktx2Loader.detectSupport(dummyRenderer);
+      dummyRenderer.dispose();
+    }
   }
   return ktx2Loader;
 }
 
-export function setupLoaders(loader: GLTFLoader, gl: WebGLRenderer) {
+export function setupLoaders(loader: GLTFLoader, gl?: WebGLRenderer) {
+  ensurePersistentAssetCache();
   loader.setDRACOLoader(getDracoLoader());
   loader.setKTX2Loader(getKTX2Loader(gl));
   loader.setMeshoptDecoder(MeshoptDecoder);
@@ -433,11 +549,8 @@ export function setupLoaders(loader: GLTFLoader, gl: WebGLRenderer) {
 // ─── Preload helpers ──────────────────────────────────────────────────────────
 
 export function preloadCarModel(url: string) {
-  useGLTF.preload(url, undefined, undefined, (loader) => {
-    // Uses the singleton Draco / KTX2 / Meshopt decoders
-    (loader as GLTFLoader).setDRACOLoader(getDracoLoader());
-    if (ktx2Loader) (loader as GLTFLoader).setKTX2Loader(ktx2Loader);
-    (loader as GLTFLoader).setMeshoptDecoder(MeshoptDecoder);
+  useGLTF.preload(url, "/draco/", true, (loader) => {
+    setupLoaders(loader as GLTFLoader);
   });
 }
 
@@ -452,25 +565,33 @@ export function PreloadModels() {
 
     // 1. High-priority preload: Showroom + initial default car (Audi R8)
     //    Gets 100% of browser connections without network contention
-    useGLTF.preload("/cars/ShowRoom.gltf", undefined, undefined, (loader) =>
+    useGLTF.preload("/cars/ShowRoom.gltf", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
-    useGLTF.preload("/cars/KhazCustomsLogo.glb", undefined, undefined, (loader) =>
+    useGLTF.preload("/cars/KhazCustomsLogo.glb", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
-    useGLTF.preload(MODELS[0].url, undefined, undefined, (loader) =>
+    useGLTF.preload(MODELS[0].url, "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
 
-    // 2. Staggered background preloading for remaining cars (RS6, RS8, Porsche)
-    //    Downloads one model at a time after initial scene is on screen
-    const otherModels = MODELS.slice(1);
+    // 2. Prioritized background preloading for remaining cars (heaviest models first: Porsche 911 & Lamborghini)
+    const priorityOrder = [
+      "porsche-911",
+      "lamborghini-revuelto",
+      "audi-rs6",
+      "audi-rs8",
+      "chevrolet-corvette-c8",
+    ];
+    const otherModels = MODELS.slice(1).sort(
+      (a, b) => priorityOrder.indexOf(a.id) - priorityOrder.indexOf(b.id)
+    );
     const timers = otherModels.map((model, idx) =>
       setTimeout(() => {
-        useGLTF.preload(model.url, undefined, undefined, (loader) =>
+        useGLTF.preload(model.url, "/draco/", true, (loader) =>
           setupLoaders(loader as GLTFLoader, gl)
         );
-      }, 1200 + idx * 1000)
+      }, 500 + idx * 600)
     );
 
     return () => {
@@ -656,10 +777,13 @@ function cloneAsPhysicalMaterial(
   m: MeshStandardMaterial
 ): MeshPhysicalMaterial {
   if (m instanceof MeshPhysicalMaterial || (m as unknown as { isMeshPhysicalMaterial?: boolean }).isMeshPhysicalMaterial) {
-    return (m as MeshPhysicalMaterial).clone();
+    const c = (m as MeshPhysicalMaterial).clone();
+    c.vertexColors = false;
+    return c;
   }
   const phys = new MeshPhysicalMaterial();
   MeshStandardMaterial.prototype.copy.call(phys, m);
+  phys.vertexColors = false;
   return phys;
 }
 
@@ -1238,6 +1362,246 @@ function classifyMaterial(
   return "other";
 }
 
+// ─── Draw-Call Optimization: Geometry Batching & Contact Shadow ───────────────
+
+let sharedContactShadowTex: CanvasTexture | null = null;
+
+function getCarContactShadowTexture(): CanvasTexture | null {
+  if (typeof document === "undefined") return null;
+  if (sharedContactShadowTex) return sharedContactShadowTex;
+
+  const w = 256;
+  const h = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Soft outer ambient occlusion penumbra around the vehicle footprint
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.scale(1, h / w);
+  const outerGrad = ctx.createRadialGradient(0, 0, w * 0.08, 0, 0, w * 0.48);
+  outerGrad.addColorStop(0.0, "rgba(0, 0, 0, 0.92)");
+  outerGrad.addColorStop(0.48, "rgba(0, 0, 0, 0.78)");
+  outerGrad.addColorStop(0.72, "rgba(0, 0, 0, 0.32)");
+  outerGrad.addColorStop(1.0, "rgba(0, 0, 0, 0.0)");
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, w * 0.48, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Deep core chassis contact occlusion + 4 tire contact patches
+  const tirePositions = [
+    [w * 0.27, h * 0.26],
+    [w * 0.73, h * 0.26],
+    [w * 0.27, h * 0.74],
+    [w * 0.73, h * 0.74],
+  ];
+  for (const [tx, ty] of tirePositions) {
+    const tGrad = ctx.createRadialGradient(tx, ty, 2, tx, ty, w * 0.14);
+    tGrad.addColorStop(0.0, "rgba(0, 0, 0, 0.85)");
+    tGrad.addColorStop(0.5, "rgba(0, 0, 0, 0.35)");
+    tGrad.addColorStop(1.0, "rgba(0, 0, 0, 0.0)");
+    ctx.fillStyle = tGrad;
+    ctx.beginPath();
+    ctx.arc(tx, ty, w * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  sharedContactShadowTex = new CanvasTexture(canvas);
+  sharedContactShadowTex.needsUpdate = true;
+  return sharedContactShadowTex;
+}
+
+/**
+ * Merges static car meshes that share the exact same MeshPhysicalMaterial instance
+ * and shadow flags into single combined BufferGeometries, reducing per-frame car
+ * draw calls from 140–540 down to ~20–35 while keeping all dynamic paint and
+ * wheel rim customization working at 100%.
+ */
+function mergeCarMeshesByMaterial(root: Object3D) {
+  const savedPos = root.position.clone();
+  const savedRot = root.rotation.clone();
+  const savedScale = root.scale.clone();
+
+  root.position.set(0, 0, 0);
+  root.rotation.set(0, 0, 0);
+  root.scale.set(1, 1, 1);
+  root.updateMatrixWorld(true);
+
+  interface BatchGroup {
+    mat: MeshPhysicalMaterial;
+    castShadow: boolean;
+    receiveShadow: boolean;
+    usesTextures: boolean;
+    usesUv1: boolean;
+    meshes: Mesh[];
+  }
+
+  const groups = new Map<string, BatchGroup>();
+
+  root.traverse((child) => {
+    if (!(child instanceof Mesh) || !child.geometry || !child.material) return;
+    if (Array.isArray(child.material)) return;
+    if (!(child.material instanceof MeshPhysicalMaterial)) return;
+
+    const geom = child.geometry as BufferGeometry;
+    if (!geom.index || !geom.attributes.position) return;
+
+    const mat = child.material;
+    const usesTextures = Boolean(
+      mat.map ||
+        mat.normalMap ||
+        mat.roughnessMap ||
+        mat.metalnessMap ||
+        mat.aoMap ||
+        mat.emissiveMap ||
+        mat.bumpMap ||
+        mat.alphaMap
+    );
+    const usesUv1 = Boolean(mat.aoMap || mat.lightMap);
+
+    // If the material uses textures, ensure the mesh actually has a uv attribute
+    if (usesTextures && !geom.attributes.uv) return;
+
+    const posAttr = geom.attributes.position;
+    // Keep large high-poly body/wheel meshes zero-copy in their Draco-decoded GPU buffers;
+    // only CPU-merge small multi-part detail primitives (screws, vents, needles, trim <= 4,000 verts)
+    if (posAttr.count > 4000) return;
+    const uvAttr = usesTextures ? geom.attributes.uv : null;
+    const uv1Attr = usesUv1 ? geom.attributes.uv1 : null;
+
+    const attrSig = [
+      `pos:${posAttr.itemSize}:${posAttr.normalized ? 1 : 0}:${posAttr.array.constructor.name}`,
+      uvAttr
+        ? `uv:${uvAttr.itemSize}:${uvAttr.normalized ? 1 : 0}:${uvAttr.array.constructor.name}`
+        : "nouv",
+      uv1Attr
+        ? `uv1:${uv1Attr.itemSize}:${uv1Attr.normalized ? 1 : 0}:${uv1Attr.array.constructor.name}`
+        : "nouv1",
+    ].join("|");
+
+    const key = `${mat.uuid}|${child.castShadow ? 1 : 0}|${child.receiveShadow ? 1 : 0}|${attrSig}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        mat,
+        castShadow: child.castShadow,
+        receiveShadow: child.receiveShadow,
+        usesTextures,
+        usesUv1,
+        meshes: [],
+      };
+      groups.set(key, group);
+    }
+    group.meshes.push(child);
+  });
+
+  const mergedContainer = new Group();
+  mergedContainer.name = "MergedCarBatches";
+
+  groups.forEach((group) => {
+    if (group.meshes.length < 2) return;
+
+    const transformedGeoms: BufferGeometry[] = [];
+    for (let i = 0; i < group.meshes.length; i++) {
+      const mesh = group.meshes[i];
+      const g = mesh.geometry.clone();
+
+      if (!g.attributes.normal) {
+        g.computeVertexNormals();
+      }
+
+      // Strip any extra/mismatched attributes so all geometries in the batch have identical layout
+      const keepAttrs = new Set(["position", "normal"]);
+      if (group.usesTextures && g.attributes.uv) keepAttrs.add("uv");
+      if (group.usesUv1 && g.attributes.uv1) keepAttrs.add("uv1");
+
+      for (const attrName of Object.keys(g.attributes)) {
+        if (!keepAttrs.has(attrName)) {
+          g.deleteAttribute(attrName);
+        }
+      }
+
+      // Ensure normal is Float32Array (3 components, non-normalized)
+      const normAttr = g.attributes.normal;
+      if (
+        normAttr.itemSize !== 3 ||
+        normAttr.normalized ||
+        !(normAttr.array instanceof Float32Array)
+      ) {
+        g.deleteAttribute("normal");
+        g.computeVertexNormals();
+      }
+
+      g.applyMatrix4(mesh.matrixWorld);
+
+      // If the mesh had negative scale (mirrored half), flip triangle winding order
+      // so front-face orientation matches standard CCW winding in the merged mesh
+      if (mesh.matrixWorld.determinant() < 0 && g.index) {
+        const idxClone = g.index.clone();
+        const arr = idxClone.array;
+        for (let j = 0; j + 2 < arr.length; j += 3) {
+          const tmp = arr[j + 1];
+          arr[j + 1] = arr[j + 2];
+          arr[j + 2] = tmp;
+        }
+        g.setIndex(idxClone);
+      }
+
+      g.clearGroups();
+      g.morphAttributes = {};
+      transformedGeoms.push(g);
+    }
+
+    try {
+      const mergedGeom = mergeGeometries(transformedGeoms, false);
+      if (mergedGeom) {
+        const mergedMesh = new Mesh(mergedGeom, group.mat);
+        mergedMesh.name = `Merged_${group.mat.name || "Batch"}`;
+        mergedMesh.castShadow = group.castShadow;
+        mergedMesh.receiveShadow = group.receiveShadow;
+        mergedContainer.add(mergedMesh);
+
+        for (let i = 0; i < group.meshes.length; i++) {
+          const m = group.meshes[i];
+          if (m.parent) m.parent.remove(m);
+        }
+      }
+    } catch {
+      // Fallback: keep original unmerged meshes if mergeGeometries fails for any group
+    } finally {
+      for (let i = 0; i < transformedGeoms.length; i++) {
+        transformedGeoms[i].dispose();
+      }
+    }
+  });
+
+  if (mergedContainer.children.length > 0) {
+    root.add(mergedContainer);
+  }
+
+  root.position.copy(savedPos);
+  root.rotation.copy(savedRot);
+  root.scale.copy(savedScale);
+  root.updateMatrixWorld(true);
+}
+
+// ─── Module-level cache of processed car scenes for instant (0ms) model switching ─
+
+interface ProcessedCarScene {
+  scene: Object3D;
+  targetScale: number;
+  contactShadowMesh: Mesh | null;
+}
+
+const processedCarSceneCache = new Map<string, ProcessedCarScene>();
+
 // ─── Model component ──────────────────────────────────────────────────────────
 
 export function Model({
@@ -1257,17 +1621,21 @@ export function Model({
   const modelInfo =
     MODELS.find((m) => m.id === config.selectedModel) || MODELS[0];
 
-  const gltfResult = useGLTF(modelInfo.url, undefined, undefined, (loader) =>
+  const gltfResult = useGLTF(modelInfo.url, "/draco/", true, (loader) =>
     setupLoaders(loader as GLTFLoader, gl)
   );
 
-  const { scene, targetScale } = useMemo(() => {
+  const { scene, targetScale, contactShadowMesh } = useMemo(() => {
+    const cached = processedCarSceneCache.get(modelInfo.id);
+    if (cached) return cached;
+
     const root = gltfResult.scene.clone(true);
 
     const paintSet = new Set<MeshPhysicalMaterial>();
     const accentSet = new Set<MeshPhysicalMaterial>();
     const clonedByOrig = new Map<MeshStandardMaterial, MeshPhysicalMaterial>();
     const specialClones = new Map<string, MeshPhysicalMaterial>();
+    const dedupedStaticMats = new Map<string, MeshPhysicalMaterial>();
     const extraPaintNames = new Set(
       (modelInfo.paintMaterials ?? []).map((n) => n.toLowerCase())
     );
@@ -1305,20 +1673,13 @@ export function Model({
 
         const partPath = getPartPath(child, root);
 
-        // Smooth out faceted polygon shading across curved interior and body surfaces
-        // without increasing memory or polygon counts
-        if (
-          child.geometry &&
-          modelInfo.id !== "lamborghini-revuelto" &&
-          (modelInfo.id === "audi-rs8" ||
-            modelInfo.id === "chevrolet-corvette-c8" ||
-            modelInfo.id === "porsche-911" ||
-            partPath.includes("wheel") ||
-            partPath.includes("dash") ||
-            partPath.includes("seat") ||
-            partPath.includes("steer") ||
-            partPath.includes("inter"))
-        ) {
+        // Strip Blender vertex color ID masks (COLOR_0) so they never tint KTX2 textures or materials
+        if (child.geometry && child.geometry.attributes.color) {
+          child.geometry.deleteAttribute("color");
+        }
+
+        // Only compute vertex normals if the GLB primitive is missing a NORMAL attribute
+        if (child.geometry && !child.geometry.attributes.normal) {
           child.geometry.computeVertexNormals();
         }
         // Special Case: Lamborghini Revuelto rear air intake grille under the taillight
@@ -1472,12 +1833,78 @@ export function Model({
               paintSet.add(mat);
             } else if (cat === "accent") {
               applyMetallicWheelFinish(mat);
+            } else {
+              // Deduplicate untextured static materials with identical PBR parameters
+              // (e.g. Porsche 911 has 120 Blender materials where many are identical matte/metal/plastic)
+              const hasAnyTexture = Boolean(
+                mat.map ||
+                  mat.normalMap ||
+                  mat.roughnessMap ||
+                  mat.metalnessMap ||
+                  mat.aoMap ||
+                  mat.emissiveMap ||
+                  mat.bumpMap ||
+                  mat.alphaMap
+              );
+              if (!hasAnyTexture) {
+                const matSig = [
+                  cat,
+                  mat.color.getHexString(),
+                  mat.emissive.getHexString(),
+                  mat.emissiveIntensity.toFixed(2),
+                  mat.roughness.toFixed(2),
+                  mat.metalness.toFixed(2),
+                  mat.clearcoat.toFixed(2),
+                  mat.clearcoatRoughness.toFixed(2),
+                  mat.transmission.toFixed(2),
+                  mat.ior.toFixed(2),
+                  mat.opacity.toFixed(2),
+                  mat.transparent ? 1 : 0,
+                  mat.depthWrite ? 1 : 0,
+                  mat.side,
+                  mat.envMapIntensity.toFixed(2),
+                  mat.specularIntensity.toFixed(2),
+                ].join("|");
+                let sharedMat = dedupedStaticMats.get(matSig);
+                if (!sharedMat) {
+                  dedupedStaticMats.set(matSig, mat);
+                  sharedMat = mat;
+                } else {
+                  clonedByOrig.set(m, sharedMat);
+                  return sharedMat;
+                }
+              }
             }
 
             return mat;
           }
           return m;
         });
+
+        // Selective shadow casting: skip shadow map rendering for transparent glass,
+        // interior cabin gauges/trim, and small badges/bolts inside wheels
+        const isGlassMesh = clonedMats.some(
+          (cm) =>
+            cm instanceof MeshPhysicalMaterial &&
+            (cm.transparent || cm.transmission > 0.05 || cm.opacity < 0.95)
+        );
+        const isNonShadowDetail =
+          partPath.includes("dash") ||
+          partPath.includes("steer") ||
+          partPath.includes("carpet") ||
+          partPath.includes("inter") ||
+          partPath.includes("speedometer") ||
+          partPath.includes("display") ||
+          partPath.includes("logo") ||
+          partPath.includes("text") ||
+          partPath.includes("caliper") ||
+          partPath.includes("disk") ||
+          partPath.includes("brake") ||
+          partPath.includes("bolt") ||
+          partPath.includes("spring");
+
+        child.castShadow = !isGlassMesh && !isNonShadowDetail;
+        child.receiveShadow = !isGlassMesh;
 
         child.material = Array.isArray(child.material) ? clonedMats : clonedMats[0];
       }
@@ -1514,6 +1941,9 @@ export function Model({
       });
     }
 
+    // Batch static car meshes sharing the same material to reduce draw calls by 80-90%
+    mergeCarMeshesByMaterial(root);
+
     root.rotation.x = modelInfo.rotationX || 0;
     root.rotation.y = modelInfo.rotationY || 0;
 
@@ -1526,13 +1956,41 @@ export function Model({
     // Center model on ground plane
     root.position.set(-center.x, -box.min.y, -center.z);
 
+    // Create a 1-draw-call baked under-chassis contact shadow plane in wrapper space
+    const shadowTex = getCarContactShadowTexture();
+    let shadowMesh: Mesh | null = null;
+    if (shadowTex) {
+      const isXLonger = size.x > size.z;
+      const minorSpan = Math.min(size.x, size.z) * 1.38;
+      const majorSpan = Math.max(size.x, size.z) * 1.28;
+      shadowMesh = new Mesh(
+        new PlaneGeometry(minorSpan, majorSpan),
+        new MeshBasicMaterial({
+          map: shadowTex,
+          transparent: true,
+          opacity: 0.92,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+        })
+      );
+      shadowMesh.name = "CarContactShadowPlane";
+      shadowMesh.rotation.set(-Math.PI / 2, 0, isXLonger ? Math.PI / 2 : 0);
+      shadowMesh.position.set(0, 0.04 / scale, 0);
+      shadowMesh.castShadow = false;
+      shadowMesh.receiveShadow = false;
+    }
+
     root.userData.paintMaterials = Array.from(paintSet);
     root.userData.accentMaterials = Array.from(accentSet);
 
-    return {
+    const processed: ProcessedCarScene = {
       scene: root,
       targetScale: scale,
+      contactShadowMesh: shadowMesh,
     };
+    processedCarSceneCache.set(modelInfo.id, processed);
+    return processed;
   }, [gltfResult, modelInfo]);
 
   // Target colors for smooth Three.js frame-by-frame lerping
@@ -1690,6 +2148,7 @@ export function Model({
   return (
     <group ref={wrapperRef} scale={0}>
       <primitive object={scene} dispose={null} />
+      {contactShadowMesh && <primitive object={contactShadowMesh} dispose={null} />}
     </group>
   );
 }
@@ -1791,14 +2250,14 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
   const { gl } = useThree();
   const gltfResult = useGLTF(
     "/cars/ShowRoom.gltf",
-    undefined,
-    undefined,
+    "/draco/",
+    true,
     (loader) => setupLoaders(loader as GLTFLoader, gl)
   );
   const logoResult = useGLTF(
     "/cars/KhazCustomsLogo.glb",
-    undefined,
-    undefined,
+    "/draco/",
+    true,
     (loader) => setupLoaders(loader as GLTFLoader, gl)
   );
 

@@ -4,7 +4,6 @@ import { Suspense, useEffect, useRef, useMemo, useState } from "react";
 import { Canvas, useThree, useFrame, RootState } from "@react-three/fiber";
 import {
   Environment,
-  ContactShadows,
   PerspectiveCamera,
   PerformanceMonitor,
   OrbitControls,
@@ -212,20 +211,12 @@ function SceneContent({
 
   const superloopSpotRef = useRef<THREE.SpotLight>(null!);
   const superloopCenterRef = useRef<THREE.PointLight>(null!);
-  const ringLight0Ref = useRef<THREE.PointLight>(null!);
-  const ringLight1Ref = useRef<THREE.PointLight>(null!);
-  const ringLight2Ref = useRef<THREE.PointLight>(null!);
-  const ringLight3Ref = useRef<THREE.PointLight>(null!);
   const ambientLightRef = useRef<THREE.AmbientLight>(null!);
   const interiorFillRef = useRef<THREE.PointLight>(null!);
 
   useEffect(() => {
     if (superloopSpotRef.current) superloopSpotRef.current.intensity = 0;
     if (superloopCenterRef.current) superloopCenterRef.current.intensity = 0;
-    if (ringLight0Ref.current) ringLight0Ref.current.intensity = 0;
-    if (ringLight1Ref.current) ringLight1Ref.current.intensity = 0;
-    if (ringLight2Ref.current) ringLight2Ref.current.intensity = 0;
-    if (ringLight3Ref.current) ringLight3Ref.current.intensity = 0;
     if (ambientLightRef.current) ambientLightRef.current.intensity = 0;
     if (interiorFillRef.current) interiorFillRef.current.intensity = 0;
   }, [config.selectedModel]);
@@ -242,16 +233,10 @@ function SceneContent({
     if (superloopSpotRef.current && Math.abs(superloopSpotRef.current.intensity - targetSpot) > 0.005) {
       easing.damp(superloopSpotRef.current, "intensity", targetSpot, 0.25, delta);
     }
-    const targetCenter = config.lightIntensity * 1.4 * studioMultiplier;
+    // Consolidated overhead studio point light (replaces 5 separate ceiling pointLights)
+    const targetCenter = config.lightIntensity * 3.2 * studioMultiplier;
     if (superloopCenterRef.current && Math.abs(superloopCenterRef.current.intensity - targetCenter) > 0.005) {
       easing.damp(superloopCenterRef.current, "intensity", targetCenter, 0.25, delta);
-    }
-    const ringIntensity = config.lightIntensity * 0.55 * studioMultiplier;
-    if (ringLight0Ref.current && Math.abs(ringLight0Ref.current.intensity - ringIntensity) > 0.005) {
-      easing.damp(ringLight0Ref.current, "intensity", ringIntensity, 0.25, delta);
-      if (ringLight1Ref.current) easing.damp(ringLight1Ref.current, "intensity", ringIntensity, 0.25, delta);
-      if (ringLight2Ref.current) easing.damp(ringLight2Ref.current, "intensity", ringIntensity, 0.25, delta);
-      if (ringLight3Ref.current) easing.damp(ringLight3Ref.current, "intensity", ringIntensity, 0.25, delta);
     }
     const targetAmbient = config.lightIntensity * 0.25 * ambientMultiplier;
     if (ambientLightRef.current && Math.abs(ambientLightRef.current.intensity - targetAmbient) > 0.005) {
@@ -424,37 +409,8 @@ function SceneContent({
       <pointLight
         ref={superloopCenterRef}
         position={[0, 128, 0]}
-        intensity={config.lightIntensity * 1.4}
+        intensity={config.lightIntensity * 3.2}
         color="#fffaf2"
-        decay={0.35}
-      />
-
-      <pointLight
-        ref={ringLight0Ref}
-        position={[79.2, 128, 0]}
-        intensity={config.lightIntensity * 0.55}
-        color="#fff8ee"
-        decay={0.35}
-      />
-      <pointLight
-        ref={ringLight1Ref}
-        position={[-79.2, 128, 0]}
-        intensity={config.lightIntensity * 0.55}
-        color="#fff8ee"
-        decay={0.35}
-      />
-      <pointLight
-        ref={ringLight2Ref}
-        position={[0, 128, 79.2]}
-        intensity={config.lightIntensity * 0.55}
-        color="#fff8ee"
-        decay={0.35}
-      />
-      <pointLight
-        ref={ringLight3Ref}
-        position={[0, 128, -79.2]}
-        intensity={config.lightIntensity * 0.55}
-        color="#fff8ee"
         decay={0.35}
       />
 
@@ -478,17 +434,6 @@ function SceneContent({
           isDraggingCarRef={isDraggingCarRef}
         />
       </Suspense>
-
-      {/* Ground contact shadow positioned flush with the showroom floor beneath the tires */}
-      <ContactShadows
-        position={[0, 0.04, 0]}
-        opacity={0.92}
-        scale={360}
-        blur={1.6}
-        far={65}
-        resolution={1024}
-        color="#000000"
-      />
     </>
   );
 }
