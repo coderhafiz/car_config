@@ -414,7 +414,7 @@ let dracoLoader: DRACOLoader | null = null;
 let ktx2Loader: KTX2Loader | null = null;
 let persistentCacheInitialized = false;
 
-const ASSET_CACHE_NAME = "customly-u-3d-assets-v6";
+const ASSET_CACHE_NAME = "customly-u-3d-assets-v7";
 const CACHEABLE_ASSET_PREFIXES = ["/cars/", "/draco/", "/basis/", "/hdri/", "/textures/"];
 const inFlightAssetFetches = new Map<string, Promise<Response>>();
 
@@ -427,6 +427,17 @@ function ensurePersistentAssetCache() {
   Cache.enabled = true;
   if (persistentCacheInitialized || typeof window === "undefined") return;
   persistentCacheInitialized = true;
+
+  // Explicitly purge older cache stores so outdated models are never served
+  if ("caches" in window) {
+    window.caches.keys().then((keys) => {
+      keys.forEach((k) => {
+        if (k.startsWith("customly-u-3d-assets-") && k !== ASSET_CACHE_NAME) {
+          window.caches.delete(k).catch(() => undefined);
+        }
+      });
+    }).catch(() => undefined);
+  }
 
   // Request persistent storage quota so the browser never auto-evicts cached .glb models
   if (navigator.storage && typeof navigator.storage.persist === "function") {
@@ -589,7 +600,7 @@ export function PreloadModels() {
     useGLTF.preload("/cars/ShowRoom2.glb", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
-    useGLTF.preload("/cars/CustomlyULogo.glb", "/draco/", true, (loader) =>
+    useGLTF.preload("/cars/CustomlyDrasonLogo.glb", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
     loadPlasterWallTextures(gl);
@@ -2533,7 +2544,7 @@ export function Showroom({
     (loader) => setupLoaders(loader as GLTFLoader, gl)
   );
   const logoResult = useGLTF(
-    "/cars/CustomlyULogo.glb",
+    "/cars/CustomlyDrasonLogo.glb",
     "/draco/",
     true,
     (loader) => setupLoaders(loader as GLTFLoader, gl)
