@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { easing } from "maath";
@@ -20,6 +20,7 @@ import {
   BackSide,
   DoubleSide,
   CanvasTexture,
+  Texture,
   RepeatWrapping,
   SRGBColorSpace,
   BufferAttribute,
@@ -413,7 +414,7 @@ let dracoLoader: DRACOLoader | null = null;
 let ktx2Loader: KTX2Loader | null = null;
 let persistentCacheInitialized = false;
 
-const ASSET_CACHE_NAME = "customly-u-3d-assets-v5";
+const ASSET_CACHE_NAME = "customly-u-3d-assets-v6";
 const CACHEABLE_ASSET_PREFIXES = ["/cars/", "/draco/", "/basis/", "/hdri/", "/textures/"];
 const inFlightAssetFetches = new Map<string, Promise<Response>>();
 
@@ -591,6 +592,7 @@ export function PreloadModels() {
     useGLTF.preload("/cars/CustomlyULogo.glb", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
+    loadPlasterWallTextures(gl);
     useGLTF.preload(MODELS[0].url, "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
@@ -2348,6 +2350,159 @@ function createMatteWhiteShowroomTextures(): {
   return { diffuseMap, bumpMap };
 }
 
+/** Cached KTX2 textures for Showroom 2 plastered wall */
+interface PlasterWallTextures {
+  diffuse: Texture;
+  normal: Texture;
+  arm: Texture;
+}
+let cachedPlasterWallTextures: PlasterWallTextures | null = null;
+
+function loadPlasterWallTextures(
+  gl?: WebGLRenderer,
+  onLoaded?: (texs: PlasterWallTextures) => void
+): PlasterWallTextures | null {
+  if (cachedPlasterWallTextures) {
+    if (onLoaded) onLoaded(cachedPlasterWallTextures);
+    return cachedPlasterWallTextures;
+  }
+  if (typeof window === "undefined") return null;
+
+  const loader = getKTX2Loader(gl);
+  const textures = {} as Partial<PlasterWallTextures>;
+  let loadedCount = 0;
+  const checkDone = () => {
+    loadedCount++;
+    if (loadedCount === 3 && textures.diffuse && textures.normal && textures.arm) {
+      cachedPlasterWallTextures = textures as PlasterWallTextures;
+      if (onLoaded) onLoaded(cachedPlasterWallTextures);
+    }
+  };
+
+  loader.load(
+    "/textures/plastered_wall/diffuse.ktx2",
+    (tex) => {
+      tex.colorSpace = SRGBColorSpace;
+      tex.wrapS = RepeatWrapping;
+      tex.wrapT = RepeatWrapping;
+      tex.repeat.set(6, 2);
+      tex.needsUpdate = true;
+      textures.diffuse = tex;
+      checkDone();
+    },
+    undefined,
+    () => checkDone()
+  );
+
+  loader.load(
+    "/textures/plastered_wall/normal.ktx2",
+    (tex) => {
+      tex.wrapS = RepeatWrapping;
+      tex.wrapT = RepeatWrapping;
+      tex.repeat.set(6, 2);
+      tex.needsUpdate = true;
+      textures.normal = tex;
+      checkDone();
+    },
+    undefined,
+    () => checkDone()
+  );
+
+  loader.load(
+    "/textures/plastered_wall/arm.ktx2",
+    (tex) => {
+      tex.wrapS = RepeatWrapping;
+      tex.wrapT = RepeatWrapping;
+      tex.repeat.set(6, 2);
+      tex.needsUpdate = true;
+      textures.arm = tex;
+      checkDone();
+    },
+    undefined,
+    () => checkDone()
+  );
+
+  return null;
+}
+
+/**
+ * Generates an ultra-clean, seamless polished showroom epoxy/resin floor diffuse and micro-bump texture
+ * matching the luxury Batman Lamborghini showroom reference video.
+ */
+function createPolishedShowroomFloorTextures(): {
+  diffuseMap: CanvasTexture | null;
+  bumpMap: CanvasTexture | null;
+} {
+  if (typeof document === "undefined") {
+    return { diffuseMap: null, bumpMap: null };
+  }
+
+  const size = 512;
+  const diffCanvas = document.createElement("canvas");
+  diffCanvas.width = size;
+  diffCanvas.height = size;
+  const diffCtx = diffCanvas.getContext("2d");
+
+  const bumpCanvas = document.createElement("canvas");
+  bumpCanvas.width = size;
+  bumpCanvas.height = size;
+  const bumpCtx = bumpCanvas.getContext("2d");
+
+  if (!diffCtx || !bumpCtx) {
+    return { diffuseMap: null, bumpMap: null };
+  }
+
+  const diffImg = diffCtx.createImageData(size, size);
+  const bumpImg = bumpCtx.createImageData(size, size);
+  const dData = diffImg.data;
+  const bData = bumpImg.data;
+
+  let seed = 4242;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+
+      // Soft, pristine off-white architectural epoxy resin (#e0e3e6) with microscopic sheen variation
+      const micro = (rand() - 0.5) * 2;
+      const val = Math.max(220, Math.min(235, Math.round(226 + micro)));
+
+      dData[idx] = val;
+      dData[idx + 1] = val + 2;
+      dData[idx + 2] = val + 5;
+      dData[idx + 3] = 255;
+
+      const bVal = Math.max(0, Math.min(255, Math.round(128 + micro * 3)));
+      bData[idx] = bVal;
+      bData[idx + 1] = bVal;
+      bData[idx + 2] = bVal;
+      bData[idx + 3] = 255;
+    }
+  }
+
+  diffCtx.putImageData(diffImg, 0, 0);
+  bumpCtx.putImageData(bumpImg, 0, 0);
+
+  const diffuseMap = new CanvasTexture(diffCanvas);
+  diffuseMap.colorSpace = SRGBColorSpace;
+  diffuseMap.wrapS = RepeatWrapping;
+  diffuseMap.wrapT = RepeatWrapping;
+  diffuseMap.repeat.set(10, 10);
+  diffuseMap.needsUpdate = true;
+
+  const bumpMap = new CanvasTexture(bumpCanvas);
+  bumpMap.wrapS = RepeatWrapping;
+  bumpMap.wrapT = RepeatWrapping;
+  bumpMap.repeat.set(10, 10);
+  bumpMap.needsUpdate = true;
+
+  return { diffuseMap, bumpMap };
+}
+
 export function Showroom({
   lightIntensity,
   selectedShowroom = "showroom-1",
@@ -2358,6 +2513,18 @@ export function Showroom({
   const { gl } = useThree();
   const isShowroom2 = selectedShowroom === "showroom-2";
   const showroomUrl = isShowroom2 ? "/cars/ShowRoom2.glb" : "/cars/ShowRoom.glb";
+
+  const [wallTextures, setWallTextures] = useState<PlasterWallTextures | null>(() =>
+    typeof window !== "undefined" ? cachedPlasterWallTextures : null
+  );
+
+  useEffect(() => {
+    if (isShowroom2 && !wallTextures) {
+      loadPlasterWallTextures(gl, (texs) => {
+        setWallTextures(texs);
+      });
+    }
+  }, [isShowroom2, gl, wallTextures]);
 
   const gltfResult = useGLTF(
     showroomUrl,
@@ -2406,6 +2573,7 @@ export function Showroom({
     const logoMats: MeshPhysicalMaterial[] = [];
 
     const { diffuseMap, bumpMap } = createMatteWhiteShowroomTextures();
+    const { diffuseMap: floorDiff, bumpMap: floorBump } = createPolishedShowroomFloorTextures();
 
     // Mid-gray matte textured interior material for the "Cube" showroom mesh.
     // Rendering `BackSide` flips normals inward for proper interior lighting and
@@ -2537,16 +2705,37 @@ export function Showroom({
               mat.metalness = 0.82;
               mat.roughness = 0.28;
             } else if (mName === "wall") {
-              mat.color.set("#5a5e66");
-              mat.map = diffuseMap;
-              mat.bumpMap = bumpMap;
-              mat.bumpScale = 0.012;
-              mat.metalness = 0.04;
-              mat.roughness = 0.92;
-              mat.specularIntensity = 0.06;
-              mat.envMapIntensity = 0.15;
+              // Textured plastered wall using KTX2 textures (diffuse, normal, ARM)
+              if (wallTextures) {
+                mat.map = wallTextures.diffuse;
+                mat.normalMap = wallTextures.normal;
+                mat.normalScale.set(1.15, 1.15);
+                mat.roughnessMap = wallTextures.arm;
+                mat.aoMap = wallTextures.arm;
+                mat.aoMapIntensity = 0.85;
+                mat.color.set("#d4d7db");
+              } else {
+                mat.color.set("#d4d7db");
+                mat.map = null;
+                mat.normalMap = null;
+              }
+              mat.metalness = 0.02;
+              mat.roughness = 0.82;
+              mat.specularIntensity = 0.12;
+              mat.envMapIntensity = 0.3;
             } else if (mName === "material.006") {
-              // Original authored floor from showroom 2.glb (untouched), just receives the car shadow
+              // High-end luxury polished showroom epoxy floor matching the Batman Lamborghini video
+              mat.color.set("#dce0e4");
+              mat.map = floorDiff;
+              mat.bumpMap = floorBump;
+              mat.bumpScale = 0.002;
+              mat.metalness = 0.04;
+              mat.roughness = 0.16; // smooth glossy showroom reflections
+              mat.clearcoat = 0.95; // polished epoxy resin topcoat
+              mat.clearcoatRoughness = 0.06;
+              mat.specularIntensity = 0.92;
+              mat.specularColor.set("#ffffff");
+              mat.envMapIntensity = 0.82;
               mesh.receiveShadow = true;
             }
           } else if (mName === "wheel brake disk.001") {
@@ -2604,7 +2793,7 @@ export function Showroom({
     return {
       scene: root,
     };
-  }, [gltfResult, logoResult, isShowroom2]);
+  }, [gltfResult, logoResult, isShowroom2, wallTextures]);
 
   const deepBlueLogoColor = useMemo(() => new Color("#0035b8"), []);
   const neonBlueLogoColor = useMemo(() => new Color("#1e8aff"), []);

@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "customly-u-3d-assets-";
-const CACHE_NAME = `${CACHE_PREFIX}v5`;
+const CACHE_NAME = `${CACHE_PREFIX}v6`;
 
 const CRITICAL_DECODERS = [
   "/draco/draco_decoder.js",
