@@ -223,7 +223,7 @@ export default function Home() {
           >
             <div className="flex items-center">
               <h1
-                className="text-lg lg:text-xl font-normal tracking-[0.16em] text-white"
+                className="text-sm sm:text-base lg:text-xl font-normal tracking-[0.12em] sm:tracking-[0.16em] text-white"
                 style={{ fontFamily: "'Drason', var(--font-open-sans), sans-serif" }}
               >
                 customly-<span className="text-brand-primary">U</span>

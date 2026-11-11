@@ -2561,12 +2561,12 @@ export function Showroom({
       if (isShowroom2) {
         // Mount on the studio wall facing into the room, elevated under the raised ceiling
         logoRoot.rotation.set(0, Math.PI / 2, 0);
-        logoRoot.scale.setScalar(0.78);
+        logoRoot.scale.setScalar(0.58);
         logoRoot.position.set(-13.15, 2.35 * SHOWROOM2_CEILING_SCALE, 0);
       } else {
         // Mount flush on the left showroom wall at eye level
         logoRoot.rotation.set(0, Math.PI / 2, 0);
-        logoRoot.scale.setScalar(0.62);
+        logoRoot.scale.setScalar(0.48);
         logoRoot.position.set(-6.94, 7.55, 11.4);
       }
     }
