@@ -2263,6 +2263,8 @@ export function Model({
 // "Superloop Light 200" at [3.458809, 5.9796085, 13.259531], where Y = 5.9796085 is the
 // exact floor height of the "Cube" mesh.
 const SHOWROOM_SCALE = 55.31;
+/** Vertical stretch applied to Showroom 2 walls/ceiling (1 = original height) */
+const SHOWROOM2_CEILING_SCALE = 1.3;
 const SHOWROOM_OFFSET: [number, number, number] = [
   -3.458809,
   -5.9796085,
@@ -2380,11 +2382,18 @@ export function Showroom({
       textNode.quaternion.set(-0.5, -0.5, 0.5, -0.5);
       if (isShowroom2) {
         textNode.scale.setScalar(0.795);
-        textNode.position.set(-13.22, 2.22, -5.75);
+        textNode.position.set(-13.22, 2.22 * SHOWROOM2_CEILING_SCALE, -5.75);
       } else {
         textNode.scale.setScalar(0.62);
         textNode.position.set(-6.94, 7.71, 8.76);
       }
+    }
+    if (isShowroom2) {
+      // Raise the ceiling: stretch walls, ceiling grid and light panels vertically (floor stays flat)
+      root.children.forEach((c) => {
+        c.scale.y *= SHOWROOM2_CEILING_SCALE;
+        c.position.y *= SHOWROOM2_CEILING_SCALE;
+      });
     }
     root.add(logoRoot);
 
@@ -2533,14 +2542,7 @@ export function Showroom({
               mat.specularIntensity = 0.06;
               mat.envMapIntensity = 0.15;
             } else if (mName === "material.006") {
-              mat.color.set("#444850");
-              mat.map = diffuseMap;
-              mat.bumpMap = bumpMap;
-              mat.bumpScale = 0.01;
-              mat.metalness = 0.04;
-              mat.roughness = 0.88;
-              mat.specularIntensity = 0.08;
-              mat.envMapIntensity = 0.18;
+              // Original authored floor from showroom 2.glb (untouched), just receives the car shadow
               mesh.receiveShadow = true;
             }
           } else if (mName === "wheel brake disk.001") {
@@ -2588,7 +2590,7 @@ export function Showroom({
 
     if (isShowroom2) {
       root.scale.setScalar(0.78);
-      root.position.set(0, -0.00881025 * 0.78, 0);
+      root.position.set(0, -0.00881025 * SHOWROOM2_CEILING_SCALE * 0.78, 0);
     } else {
       root.scale.setScalar(1);
       root.position.set(...SHOWROOM_OFFSET);
