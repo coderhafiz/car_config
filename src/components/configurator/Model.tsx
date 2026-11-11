@@ -413,7 +413,7 @@ let dracoLoader: DRACOLoader | null = null;
 let ktx2Loader: KTX2Loader | null = null;
 let persistentCacheInitialized = false;
 
-const ASSET_CACHE_NAME = "customly-u-3d-assets-v4";
+const ASSET_CACHE_NAME = "customly-u-3d-assets-v5";
 const CACHEABLE_ASSET_PREFIXES = ["/cars/", "/draco/", "/basis/", "/hdri/", "/textures/"];
 const inFlightAssetFetches = new Map<string, Promise<Response>>();
 
@@ -2376,16 +2376,20 @@ export function Showroom({
     const root = gltfResult.scene.clone(true);
     const logoRoot = logoResult.scene.clone(true);
     const textNode = logoRoot.getObjectByName("Text") || logoRoot.children[0];
-    if (textNode) {
-      // Mount Cars/CUSTOMLY LOGO.glb flush onto the left showroom wall, facing into the studio at eye level.
-      // Local bounds of CUSTOMLY LOGO.glb: X in [0.01, 8.50] (width 8.49), Y in [-0.184, 0], Z in [-0.517, 0].
-      textNode.quaternion.set(-0.5, -0.5, 0.5, -0.5);
+    if (textNode && (textNode as Mesh).geometry) {
+      // Center the 3D Drason text geometry at origin so positioning is exact
+      (textNode as Mesh).geometry.center();
+
       if (isShowroom2) {
-        textNode.scale.setScalar(0.795);
-        textNode.position.set(-13.22, 2.22 * SHOWROOM2_CEILING_SCALE, -5.75);
+        // Mount on the studio wall facing into the room, elevated under the raised ceiling
+        logoRoot.rotation.set(0, Math.PI / 2, 0);
+        logoRoot.scale.setScalar(0.78);
+        logoRoot.position.set(-13.15, 2.35 * SHOWROOM2_CEILING_SCALE, 0);
       } else {
-        textNode.scale.setScalar(0.62);
-        textNode.position.set(-6.94, 7.71, 8.76);
+        // Mount flush on the left showroom wall at eye level
+        logoRoot.rotation.set(0, Math.PI / 2, 0);
+        logoRoot.scale.setScalar(0.62);
+        logoRoot.position.set(-6.94, 7.55, 11.4);
       }
     }
     if (isShowroom2) {
