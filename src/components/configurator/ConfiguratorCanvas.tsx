@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useRef, useMemo, useState } from "react";
 import { Canvas, useThree, useFrame, RootState } from "@react-three/fiber";
 import {
-  Environment,
   PerspectiveCamera,
   PerformanceMonitor,
   OrbitControls,
@@ -427,16 +426,7 @@ function SceneContent({
         }
       />
 
-      {/* Studio Environment generated directly from the plane light instead of brown_photostudio_01_1k.exr */}
-      <Environment frames={1} resolution={256} environmentIntensity={0.45 * config.lightIntensity}>
-        {/* Luminous softbox light panel reflected across metallic paint, windshield & clearcoat */}
-        <mesh position={[45, 120, 50]} rotation={[-Math.PI / 3.2, Math.PI / 4, 0]}>
-          <planeGeometry args={[140, 55]} />
-          <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
-        </mesh>
-      </Environment>
-
-      {/* Studio Plane Light (RectAreaLight) replacing the HDRI lighting from the same direction */}
+      {/* Studio Plane Light (RectAreaLight): completely invisible light emitter with no visible geometry */}
       <group ref={planeLightGroupRef} position={[45, 120, 50]}>
         <rectAreaLight
           ref={planeLightRef}
@@ -445,11 +435,6 @@ function SceneContent({
           color="#ffffff"
           intensity={config.lightIntensity * 16.0}
         />
-        {/* Physical visible softbox diffuser panel high in the studio ceiling */}
-        <mesh>
-          <planeGeometry args={[140, 55]} />
-          <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
-        </mesh>
       </group>
 
       {/* Paired directional studio key light from the plane light direction */}
