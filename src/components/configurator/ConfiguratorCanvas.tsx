@@ -212,10 +212,23 @@ function SceneContent({
   const superloopSpotRef = useRef<THREE.SpotLight>(null!);
   const superloopCenterRef = useRef<THREE.PointLight>(null!);
   const superloopFrontRef = useRef<THREE.SpotLight>(null!);
+  const planeLightGroupRef = useRef<THREE.Group>(null!);
+  const planeLightRef = useRef<THREE.RectAreaLight>(null!);
+  const planeDirectionalRef = useRef<THREE.DirectionalLight>(null!);
   const ambientLightRef = useRef<THREE.AmbientLight>(null!);
   const interiorFillRef = useRef<THREE.PointLight>(null!);
 
   const { gl } = useThree();
+
+  useEffect(() => {
+    if (planeLightGroupRef.current) {
+      planeLightGroupRef.current.lookAt(0, 20, 0);
+    }
+    if (planeDirectionalRef.current) {
+      planeDirectionalRef.current.target.position.set(0, 20, 0);
+      planeDirectionalRef.current.target.updateMatrixWorld();
+    }
+  }, []);
 
   useEffect(() => {
     const renderer = gl as THREE.WebGLRenderer;
@@ -232,6 +245,8 @@ function SceneContent({
     if (superloopSpotRef.current) superloopSpotRef.current.intensity = 0;
     if (superloopCenterRef.current) superloopCenterRef.current.intensity = 0;
     if (superloopFrontRef.current) superloopFrontRef.current.intensity = 0;
+    if (planeLightRef.current) planeLightRef.current.intensity = 0;
+    if (planeDirectionalRef.current) planeDirectionalRef.current.intensity = 0;
     if (ambientLightRef.current) ambientLightRef.current.intensity = 0;
     if (interiorFillRef.current) interiorFillRef.current.intensity = 0;
     gl.shadowMap.needsUpdate = true;
@@ -259,6 +274,16 @@ function SceneContent({
     if (superloopFrontRef.current && Math.abs(superloopFrontRef.current.intensity - targetFront) > 0.005) {
       easing.damp(superloopFrontRef.current, "intensity", targetFront, 0.25, delta);
     }
+    // Studio Plane Light replacing HDRI lighting from the same overhead key direction
+    const targetPlaneLight = config.lightIntensity * 16.0 * studioMultiplier;
+    if (planeLightRef.current && Math.abs(planeLightRef.current.intensity - targetPlaneLight) > 0.05) {
+      easing.damp(planeLightRef.current, "intensity", targetPlaneLight, 0.25, delta);
+    }
+    const targetPlaneDir = config.lightIntensity * 2.2 * studioMultiplier;
+    if (planeDirectionalRef.current && Math.abs(planeDirectionalRef.current.intensity - targetPlaneDir) > 0.01) {
+      easing.damp(planeDirectionalRef.current, "intensity", targetPlaneDir, 0.25, delta);
+    }
+
     // Ambient studio bounce so sculpt lines and shadows are distinct and never pitch black
     const targetAmbient = config.lightIntensity * 0.45 * ambientMultiplier;
     if (ambientLightRef.current && Math.abs(ambientLightRef.current.intensity - targetAmbient) > 0.005) {
@@ -402,11 +427,38 @@ function SceneContent({
         }
       />
 
-      <Environment
-        files="/hdri/brown_photostudio_01_1k.exr"
-        blur={1}
-        background={false}
-        environmentIntensity={0.45 * config.lightIntensity}
+      {/* Studio Environment generated directly from the plane light instead of brown_photostudio_01_1k.exr */}
+      <Environment frames={1} resolution={256} environmentIntensity={0.45 * config.lightIntensity}>
+        {/* Luminous softbox light panel reflected across metallic paint, windshield & clearcoat */}
+        <mesh position={[45, 120, 50]} rotation={[-Math.PI / 3.2, Math.PI / 4, 0]}>
+          <planeGeometry args={[140, 55]} />
+          <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+        </mesh>
+      </Environment>
+
+      {/* Studio Plane Light (RectAreaLight) replacing the HDRI lighting from the same direction */}
+      <group ref={planeLightGroupRef} position={[45, 120, 50]}>
+        <rectAreaLight
+          ref={planeLightRef}
+          width={140}
+          height={55}
+          color="#ffffff"
+          intensity={config.lightIntensity * 16.0}
+        />
+        {/* Physical visible softbox diffuser panel high in the studio ceiling */}
+        <mesh>
+          <planeGeometry args={[140, 55]} />
+          <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+
+      {/* Paired directional studio key light from the plane light direction */}
+      <directionalLight
+        ref={planeDirectionalRef}
+        position={[45, 120, 50]}
+        intensity={config.lightIntensity * 2.2}
+        color="#fffbf7"
+        castShadow={false}
       />
 
       <ambientLight
