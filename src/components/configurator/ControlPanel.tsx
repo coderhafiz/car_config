@@ -1,9 +1,9 @@
 "use client";
 
-import { MODELS, ConfigState, preloadCarModel, DEFAULT_STICKERS, DECAL_PRESETS, DecalConfig } from "./Model";
+import { MODELS, ConfigState, preloadCarModel, DEFAULT_STICKERS, DecalConfig } from "./Model";
 import { Dispatch, SetStateAction, useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Eye, Sofa, Upload, Trash2, Crosshair } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, Sofa, Upload, Trash2, Crosshair, Plus } from "lucide-react";
 import { useTheme } from "../ui/ThemeProvider";
 import { useSafari } from "@/hooks/useSafari";
 
@@ -416,12 +416,45 @@ export default function ControlPanel({
     return stickers.find((s) => s.id === config.activeStickerId) || stickers[0] || null;
   }, [config.stickers, config.activeStickerId]);
 
-  const handleSelectSticker = (stickerId: string, url: string, name: string) => {
-    const carPresets = DECAL_PRESETS[config.selectedModel] || DECAL_PRESETS["audi-r8"];
-    const defaultPreset = carPresets.hood;
+  const handleAddNewSticker = (template?: { id?: string; url: string; name: string }) => {
+    const tmpl = template || DEFAULT_STICKERS[0];
+    const existingPresets = new Set((config.stickers || []).map((s) => s.preset));
+    const candidatePresets: Array<"hood" | "roof" | "rightDoor" | "leftDoor"> = [
+      "hood",
+      "roof",
+      "rightDoor",
+      "leftDoor",
+    ];
+    const nextPreset = candidatePresets.find((p) => !existingPresets.has(p)) || "roof";
 
+    const existingIds = new Set((config.stickers || []).map((s) => s.id));
+    let count = (config.stickers || []).length + 1;
+    let uniqueId = `sticker-${tmpl.id || "decal"}-${count}`;
+    while (existingIds.has(uniqueId)) {
+      count++;
+      uniqueId = `sticker-${tmpl.id || "decal"}-${count}`;
+    }
+    const newSticker: DecalConfig = {
+      id: uniqueId,
+      name: tmpl.name,
+      textureUrl: tmpl.url,
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [34, 34, 16],
+      preset: nextPreset,
+      mirrored: false,
+    };
+
+    setConfig((prev) => ({
+      ...prev,
+      stickers: [...(prev.stickers || []), newSticker],
+      activeStickerId: uniqueId,
+    }));
+  };
+
+  const handleSelectSticker = (stickerId: string, url: string, name: string) => {
     if (activeSticker) {
-      // Update active sticker texture
+      // Update active sticker graphic
       setConfig((prev) => ({
         ...prev,
         stickers: (prev.stickers || []).map((s) =>
@@ -429,29 +462,14 @@ export default function ControlPanel({
         ),
       }));
     } else {
-      // Create new sticker on front hood
-      const newSticker: DecalConfig = {
-        id: `sticker-${stickerId}`,
-        name,
-        textureUrl: url,
-        position: [...defaultPreset.position],
-        rotation: [...defaultPreset.rotation],
-        scale: [...defaultPreset.scale],
-        preset: "hood",
-        mirrored: false,
-      };
-      setConfig((prev) => ({
-        ...prev,
-        stickers: [...(prev.stickers || []), newSticker],
-        activeStickerId: newSticker.id,
-      }));
+      // Create new sticker
+      handleAddNewSticker({ id: stickerId, url, name });
     }
   };
 
   const handleApplyPreset = (presetKey: "roof" | "hood" | "leftDoor" | "rightDoor") => {
     if (!activeSticker) return;
-    const carPresets = DECAL_PRESETS[config.selectedModel] || DECAL_PRESETS["audi-r8"];
-    const preset = carPresets[presetKey];
+        const preset = carPresets[presetKey];
     if (!preset) return;
 
     const isDoor = presetKey === "leftDoor" || presetKey === "rightDoor";
@@ -502,16 +520,31 @@ export default function ControlPanel({
     reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;
       if (!dataUrl) return;
-      const carPresets = DECAL_PRESETS[config.selectedModel] || DECAL_PRESETS["audi-r8"];
-      const defaultPreset = carPresets.hood;
+      const existingPresets = new Set((config.stickers || []).map((s) => s.preset));
+      const candidatePresets: Array<"hood" | "roof" | "rightDoor" | "leftDoor"> = [
+        "hood",
+        "roof",
+        "rightDoor",
+        "leftDoor",
+      ];
+      const nextPreset = candidatePresets.find((p) => !existingPresets.has(p)) || "roof";
+
+      const existingIds = new Set((config.stickers || []).map((s) => s.id));
+      let count = (config.stickers || []).length + 1;
+      const baseName = file.name.replace(/[^a-zA-Z0-9]/g, "");
+      let uniqueId = `upload-${baseName}-${count}`;
+      while (existingIds.has(uniqueId)) {
+        count++;
+        uniqueId = `upload-${baseName}-${count}`;
+      }
       const newSticker: DecalConfig = {
-        id: `upload-${file.name.replace(/[^a-zA-Z0-9]/g, "")}-${file.size}`,
+        id: uniqueId,
         name: file.name.replace(/\.[^/.]+$/, ""),
         textureUrl: dataUrl,
-        position: [...defaultPreset.position],
-        rotation: [...defaultPreset.rotation],
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
         scale: [34, 34, 16],
-        preset: "hood",
+        preset: nextPreset,
         mirrored: false,
       };
       setConfig((prev) => ({
@@ -694,8 +727,62 @@ export default function ControlPanel({
             ))}
           </div>
 
+          {/* Button to add another decal to car */}
+          {activeSticker && (
+            <button
+              onClick={() => handleAddNewSticker()}
+              className="w-full py-1.5 px-3 text-xs rounded-[3px] border border-dashed border-brand/60 hover:border-brand text-brand glass glass-hover flex items-center justify-center gap-1.5 font-semibold transition-all"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Another Decal to Car</span>
+            </button>
+          )}
+
           {activeSticker && (
             <div className="mt-3 pt-3 border-t border-border-glass space-y-3">
+              {/* Placed Stickers Tabs */}
+              <div>
+                <div className="flex items-center justify-between text-[11px] font-semibold text-text-sub uppercase tracking-wider mb-1.5">
+                  <span>Vehicle Decals ({config.stickers?.length || 0})</span>
+                  <button
+                    onClick={() => handleAddNewSticker()}
+                    className="flex items-center gap-1 text-brand hover:underline font-semibold cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>+ Add</span>
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  {(config.stickers || []).map((st, idx) => {
+                    const presetLabel =
+                      st.preset === "roof"
+                        ? "Roof"
+                        : st.preset === "hood"
+                        ? "Hood"
+                        : st.preset === "rightDoor"
+                        ? "R-Door"
+                        : st.preset === "leftDoor"
+                        ? "L-Door"
+                        : "Custom";
+                    return (
+                      <button
+                        key={st.id}
+                        onClick={() => setConfig((p) => ({ ...p, activeStickerId: st.id }))}
+                        className={`px-2.5 py-1 text-xs rounded-[3px] border flex items-center gap-1.5 whitespace-nowrap transition-all ${
+                          st.id === activeSticker?.id
+                            ? "bg-brand text-white border-brand font-semibold shadow-sm"
+                            : "glass glass-hover border-border-glass text-text-sub"
+                        }`}
+                      >
+                        <span>#{idx + 1}</span>
+                        <span className="truncate max-w-[80px]">{st.name?.split(" ")[0] || "Decal"}</span>
+                        <span className="text-[10px] opacity-75">({presetLabel})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Preset Snapping (Top & Sides) */}
               <div>
                 <span className="text-[11px] font-semibold text-text-sub uppercase tracking-wider block mb-1.5">

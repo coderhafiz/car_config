@@ -574,7 +574,26 @@ export default function ConfiguratorCanvas({
     setConfig((prev) => {
       const stickers = prev.stickers || [];
       const activeId = prev.activeStickerId || stickers[0]?.id;
-      if (!activeId) return prev;
+      if (!activeId) {
+        const uniqueId = `sticker-placed-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+        const newSticker = {
+          id: uniqueId,
+          name: "Custom Placement",
+          textureUrl: "/stickers/apex-gt.svg",
+          position: pos,
+          rotation: rot,
+          scale: [34, 34, 16] as [number, number, number],
+          targetMeshName: meshName,
+          preset: "custom" as const,
+          mirrored: false,
+        };
+        return {
+          ...prev,
+          stickers: [...stickers, newSticker],
+          activeStickerId: uniqueId,
+          stickerPlacementMode: false,
+        };
+      }
 
       const updated = stickers.map((s) => {
         if (s.id === activeId) {

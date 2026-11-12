@@ -1765,6 +1765,9 @@ function DecalItem({
   const posY = decal.position?.[1] || 0;
   const posZ = decal.position?.[2] || 0;
 
+  // Fixed 2-element key so dependency array size NEVER changes between renders
+  const decalKey = `${decal.id}:${decal.textureUrl}:${decal.preset || "none"}:${scaleX}:${rotX.toFixed(3)}:${rotY.toFixed(3)}:${rotZ.toFixed(3)}:${posX.toFixed(3)}:${posY.toFixed(3)}:${posZ.toFixed(3)}:${Boolean(decal.mirrored)}:${mattePaint}`;
+
   useEffect(() => {
     if (!bodyMesh || !bodyMesh.geometry) return;
 
@@ -1858,7 +1861,8 @@ function DecalItem({
         decalGeom.dispose();
       }
     };
-  }, [bodyMesh, decal.id, decal.textureUrl, decal.preset, scaleX, rotX, rotY, rotZ, posX, posY, posZ, decal.mirrored, mattePaint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bodyMesh, decalKey]);
 
   return null;
 }
