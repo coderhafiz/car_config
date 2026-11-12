@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useMemo, Fragment } from "react";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 import { DecalGeometry } from "three-stdlib";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -27,7 +27,7 @@ import {
   BufferAttribute,
   Color,
   Euler,
-  Texture,
+  Material,
   TextureLoader,
   PointLight,
   SpotLight,
@@ -1748,33 +1748,6 @@ interface ProcessedCarScene {
 
 const processedCarSceneCache = new Map<string, ProcessedCarScene>();
 
-function findBestBodyMesh(
-  bodyMeshes: Mesh[],
-  pos: [number, number, number],
-  meshName?: string
-): Mesh | null {
-  if (bodyMeshes.length === 0) return null;
-  if (meshName) {
-    const named = bodyMeshes.find((m) => m.name === meshName);
-    if (named) return named;
-  }
-  const v = new Vector3(...pos);
-  let bestDist = Infinity;
-  let bestMesh = bodyMeshes[0];
-  const box = new Box3();
-
-  for (let i = 0; i < bodyMeshes.length; i++) {
-    const m = bodyMeshes[i];
-    box.setFromObject(m);
-    const dist = box.distanceToPoint(v);
-    if (dist < bestDist) {
-      bestDist = dist;
-      bestMesh = m;
-    }
-  }
-  return bestMesh;
-}
-
 function DecalItem({
   bodyMesh,
   decal,
@@ -1784,53 +1757,110 @@ function DecalItem({
   decal: DecalConfig;
   mattePaint: boolean;
 }) {
-  const [texture, setTexture] = useState<Texture | null>(null);
+  const scaleX = decal.scale?.[0] || 34;
+  const rotX = decal.rotation?.[0] || 0;
+  const rotY = decal.rotation?.[1] || 0;
+  const rotZ = decal.rotation?.[2] || 0;
+  const posX = decal.position?.[0] || 0;
+  const posY = decal.position?.[1] || 0;
+  const posZ = decal.position?.[2] || 0;
 
   useEffect(() => {
+    if (!bodyMesh || !bodyMesh.geometry) return;
+
     let active = true;
+    let decalMesh: Mesh | null = null;
+    let decalGeom: BufferGeometry | null = null;
+
     const loader = new TextureLoader();
     loader.load(decal.textureUrl, (tex) => {
       if (!active) return;
       tex.colorSpace = SRGBColorSpace;
       tex.needsUpdate = true;
-      setTexture(tex);
+
+      try {
+        bodyMesh.geometry.computeBoundingBox();
+        const bBox = bodyMesh.geometry.boundingBox;
+        if (!bBox) return;
+
+        const carLen = Math.max(1, bBox.max.z - bBox.min.z);
+        const carHeight = Math.max(0.5, bBox.max.y - bBox.min.y);
+        const center = bBox.getCenter(new Vector3());
+
+        const baseSize = carLen * 0.16;
+        const scaleMult = scaleX / 34;
+        const decalWidth = baseSize * scaleMult;
+        const decalHeight = baseSize * scaleMult;
+        const decalDepth = baseSize * 0.9;
+        const size = new Vector3(decalWidth, decalHeight, decalDepth);
+
+        let pos: Vector3;
+        let rot: Euler;
+
+        const customRotZ = rotZ;
+
+        if (decal.preset === "roof") {
+          pos = new Vector3(center.x, bBox.max.y - 0.01, center.z - carLen * 0.05);
+          rot = new Euler(Math.PI / 2, 0, customRotZ);
+        } else if (decal.preset === "hood") {
+          pos = new Vector3(center.x, bBox.min.y + carHeight * 0.62, center.z + carLen * 0.28);
+          rot = new Euler(Math.PI / 2.3, 0, customRotZ);
+        } else if (decal.preset === "rightDoor") {
+          pos = new Vector3(bBox.max.x - 0.01, bBox.min.y + carHeight * 0.45, center.z);
+          rot = new Euler(0, -Math.PI / 2, customRotZ);
+        } else if (decal.preset === "leftDoor") {
+          pos = new Vector3(bBox.min.x + 0.01, bBox.min.y + carHeight * 0.45, center.z);
+          rot = new Euler(0, Math.PI / 2, customRotZ);
+        } else {
+          pos = new Vector3(posX, posY, posZ);
+          rot = new Euler(rotX, rotY, customRotZ);
+        }
+
+        const savedMW = bodyMesh.matrixWorld.clone();
+        bodyMesh.matrixWorld.identity();
+
+        decalGeom = new DecalGeometry(bodyMesh, pos, rot, size);
+        bodyMesh.matrixWorld.copy(savedMW);
+
+        if (decalGeom.attributes.position && decalGeom.attributes.position.count > 0) {
+          const decalMat = new MeshPhysicalMaterial({
+            map: tex,
+            transparent: true,
+            alphaTest: 0.01,
+            roughness: mattePaint ? 0.9 : 0.18,
+            clearcoat: mattePaint ? 0.0 : 0.8,
+            clearcoatRoughness: 0.04,
+            polygonOffset: true,
+            polygonOffsetFactor: -4,
+            polygonOffsetUnits: -4,
+            depthWrite: false,
+            depthTest: true,
+          });
+
+          decalMesh = new Mesh(decalGeom, decalMat);
+          decalMesh.name = `Decal_${decal.id}`;
+          bodyMesh.add(decalMesh);
+        }
+      } catch (err) {
+        console.warn("Decal generation error:", err);
+      }
     });
+
     return () => {
       active = false;
+      if (decalMesh) {
+        bodyMesh.remove(decalMesh);
+        if (decalMesh.material) {
+          (decalMesh.material as Material).dispose();
+        }
+      }
+      if (decalGeom) {
+        decalGeom.dispose();
+      }
     };
-  }, [decal.textureUrl]);
+  }, [bodyMesh, decal.id, decal.textureUrl, decal.preset, scaleX, rotX, rotY, rotZ, posX, posY, posZ, decal.mirrored, mattePaint]);
 
-  const geometry = useMemo(() => {
-    if (!bodyMesh) return null;
-    try {
-      const pos = new Vector3(...decal.position);
-      const rot = new Euler(...decal.rotation);
-      const size = new Vector3(...decal.scale);
-      return new DecalGeometry(bodyMesh, pos, rot, size);
-    } catch {
-      return null;
-    }
-  }, [bodyMesh, decal.position, decal.rotation, decal.scale]);
-
-  if (!geometry || !texture) return null;
-
-  return (
-    <mesh geometry={geometry}>
-      <meshPhysicalMaterial
-        map={texture}
-        transparent
-        alphaTest={0.01}
-        roughness={mattePaint ? 0.9 : 0.18}
-        clearcoat={mattePaint ? 0.0 : 0.8}
-        clearcoatRoughness={0.04}
-        polygonOffset
-        polygonOffsetFactor={-4}
-        polygonOffsetUnits={-4}
-        depthWrite={false}
-        depthTest={true}
-      />
-    </mesh>
-  );
+  return null;
 }
 
 export function CarDecals({
@@ -1846,33 +1876,41 @@ export function CarDecals({
     return null;
   }
 
+  const primaryMesh = bodyMeshes[0];
+
   return (
-    <group>
+    <>
       {stickers.map((st) => {
-        const targetMesh = findBestBodyMesh(bodyMeshes, st.position, st.targetMeshName);
+        const targetMesh =
+          (st.targetMeshName ? bodyMeshes.find((m) => m.name === st.targetMeshName) : null) ||
+          primaryMesh;
         if (!targetMesh) return null;
 
         return (
-          <group key={st.id}>
+          <Fragment key={st.id}>
             <DecalItem bodyMesh={targetMesh} decal={st} mattePaint={mattePaint} />
             {st.mirrored && (
               <DecalItem
-                bodyMesh={
-                  findBestBodyMesh(bodyMeshes, [-st.position[0], st.position[1], st.position[2]]) || targetMesh
-                }
+                bodyMesh={targetMesh}
                 decal={{
                   ...st,
                   id: `${st.id}-mirrored`,
+                  preset:
+                    st.preset === "leftDoor"
+                      ? "rightDoor"
+                      : st.preset === "rightDoor"
+                      ? "leftDoor"
+                      : st.preset,
                   position: [-st.position[0], st.position[1], st.position[2]],
                   rotation: [st.rotation[0], -st.rotation[1], -st.rotation[2]],
                 }}
                 mattePaint={mattePaint}
               />
             )}
-          </group>
+          </Fragment>
         );
       })}
-    </group>
+    </>
   );
 }
 
@@ -2269,9 +2307,35 @@ export function Model({
       shadowMesh.receiveShadow = false;
     }
 
+    // Extract active in-scene body paint meshes (including merged batches) for decals
+    const activeBodyMeshes: Mesh[] = [];
+    root.traverse((child) => {
+      if (child instanceof Mesh && child.geometry) {
+        const mat = child.material;
+        const isPaint = Array.isArray(mat)
+          ? mat.some((m) => paintSet.has(m as MeshPhysicalMaterial))
+          : paintSet.has(mat as MeshPhysicalMaterial);
+        const isNamedBody =
+          child.name.startsWith("Merged_") ||
+          child.name.toLowerCase().includes("body") ||
+          child.name.toLowerCase().includes("carpaint");
+
+        if (isPaint || isNamedBody) {
+          activeBodyMeshes.push(child);
+          if (!(child.geometry as BufferGeometry & { boundsTree?: unknown }).boundsTree) {
+            try {
+              (child.geometry as BufferGeometry & { computeBoundsTree?: () => void }).computeBoundsTree?.();
+            } catch {
+              // ignore non-manifold edges
+            }
+          }
+        }
+      }
+    });
+
     root.userData.paintMaterials = Array.from(paintSet);
     root.userData.accentMaterials = Array.from(accentSet);
-    root.userData.bodyMeshes = bodyMeshes;
+    root.userData.bodyMeshes = activeBodyMeshes.length > 0 ? activeBodyMeshes : bodyMeshes;
 
     const processed: ProcessedCarScene = {
       scene: root,
@@ -2506,14 +2570,9 @@ export function Model({
         );
         if (!hit || !hit.face) return;
 
-        // Convert world hit point & normal into local car coordinates via BVH
-        const localPoint = wrapperRef.current.worldToLocal(hit.point.clone());
-        const worldNormal = hit.face.normal
-          .clone()
-          .transformDirection(hit.object.matrixWorld);
-        const localNormal = worldNormal.clone().applyQuaternion(
-          wrapperRef.current.quaternion.clone().invert()
-        );
+        const targetMesh = hit.object as Mesh;
+        const localPoint = targetMesh.worldToLocal(hit.point.clone());
+        const localNormal = hit.face.normal.clone().normalize();
 
         const dummy = new Object3D();
         dummy.position.copy(localPoint);
@@ -2523,7 +2582,7 @@ export function Model({
           onPlacementHit(
             [localPoint.x, localPoint.y, localPoint.z],
             [dummy.rotation.x, dummy.rotation.y, dummy.rotation.z],
-            hit.object.name
+            targetMesh.name
           );
         }
       }}
