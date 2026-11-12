@@ -214,12 +214,6 @@ function SceneContent({
   const planeLightGroupRef = useRef<THREE.Group>(null!);
   const planeLightRef = useRef<THREE.RectAreaLight>(null!);
   const planeDirectionalRef = useRef<THREE.DirectionalLight>(null!);
-  const leftSideGroupRef = useRef<THREE.Group>(null!);
-  const leftSideAreaLightRef = useRef<THREE.RectAreaLight>(null!);
-  const leftSideDirectionalRef = useRef<THREE.DirectionalLight>(null!);
-  const rightSideGroupRef = useRef<THREE.Group>(null!);
-  const rightSideAreaLightRef = useRef<THREE.RectAreaLight>(null!);
-  const rightSideDirectionalRef = useRef<THREE.DirectionalLight>(null!);
   const ambientLightRef = useRef<THREE.AmbientLight>(null!);
   const interiorFillRef = useRef<THREE.PointLight>(null!);
 
@@ -232,20 +226,6 @@ function SceneContent({
     if (planeDirectionalRef.current) {
       planeDirectionalRef.current.target.position.set(0, 20, 0);
       planeDirectionalRef.current.target.updateMatrixWorld();
-    }
-    if (leftSideGroupRef.current) {
-      leftSideGroupRef.current.lookAt(0, 18, 0);
-    }
-    if (leftSideDirectionalRef.current) {
-      leftSideDirectionalRef.current.target.position.set(0, 18, 0);
-      leftSideDirectionalRef.current.target.updateMatrixWorld();
-    }
-    if (rightSideGroupRef.current) {
-      rightSideGroupRef.current.lookAt(0, 18, 0);
-    }
-    if (rightSideDirectionalRef.current) {
-      rightSideDirectionalRef.current.target.position.set(0, 18, 0);
-      rightSideDirectionalRef.current.target.updateMatrixWorld();
     }
   }, []);
 
@@ -266,10 +246,6 @@ function SceneContent({
     if (superloopFrontRef.current) superloopFrontRef.current.intensity = 0;
     if (planeLightRef.current) planeLightRef.current.intensity = 0;
     if (planeDirectionalRef.current) planeDirectionalRef.current.intensity = 0;
-    if (leftSideAreaLightRef.current) leftSideAreaLightRef.current.intensity = 0;
-    if (leftSideDirectionalRef.current) leftSideDirectionalRef.current.intensity = 0;
-    if (rightSideAreaLightRef.current) rightSideAreaLightRef.current.intensity = 0;
-    if (rightSideDirectionalRef.current) rightSideDirectionalRef.current.intensity = 0;
     if (ambientLightRef.current) ambientLightRef.current.intensity = 0;
     if (interiorFillRef.current) interiorFillRef.current.intensity = 0;
     gl.shadowMap.needsUpdate = true;
@@ -305,22 +281,6 @@ function SceneContent({
     const targetPlaneDir = config.lightIntensity * 2.2 * studioMultiplier;
     if (planeDirectionalRef.current && Math.abs(planeDirectionalRef.current.intensity - targetPlaneDir) > 0.01) {
       easing.damp(planeDirectionalRef.current, "intensity", targetPlaneDir, 0.25, delta);
-    }
-
-    // Left and Right Side Area Lights (Blender-style horizontal studio strip lights)
-    const targetSideArea = config.lightIntensity * 12.0 * studioMultiplier;
-    const targetSideDir = config.lightIntensity * 1.6 * studioMultiplier;
-    if (leftSideAreaLightRef.current && Math.abs(leftSideAreaLightRef.current.intensity - targetSideArea) > 0.05) {
-      easing.damp(leftSideAreaLightRef.current, "intensity", targetSideArea, 0.25, delta);
-    }
-    if (leftSideDirectionalRef.current && Math.abs(leftSideDirectionalRef.current.intensity - targetSideDir) > 0.01) {
-      easing.damp(leftSideDirectionalRef.current, "intensity", targetSideDir, 0.25, delta);
-    }
-    if (rightSideAreaLightRef.current && Math.abs(rightSideAreaLightRef.current.intensity - targetSideArea) > 0.05) {
-      easing.damp(rightSideAreaLightRef.current, "intensity", targetSideArea, 0.25, delta);
-    }
-    if (rightSideDirectionalRef.current && Math.abs(rightSideDirectionalRef.current.intensity - targetSideDir) > 0.01) {
-      easing.damp(rightSideDirectionalRef.current, "intensity", targetSideDir, 0.25, delta);
     }
 
     // Ambient studio bounce so sculpt lines and shadows are distinct and never pitch black
@@ -483,42 +443,6 @@ function SceneContent({
         position={[45, 120, 50]}
         intensity={config.lightIntensity * 2.2}
         color="#fffbf7"
-        castShadow={false}
-      />
-
-      {/* Left Side Area Light (Blender-style horizontal strip light illuminating driver side, doors & wheels) */}
-      <group ref={leftSideGroupRef} position={[-88, 28, 0]}>
-        <rectAreaLight
-          ref={leftSideAreaLightRef}
-          width={200}
-          height={32}
-          color="#fffcf8"
-          intensity={config.lightIntensity * 12.0}
-        />
-      </group>
-      <directionalLight
-        ref={leftSideDirectionalRef}
-        position={[-88, 28, 0]}
-        intensity={config.lightIntensity * 1.6}
-        color="#fffcf8"
-        castShadow={false}
-      />
-
-      {/* Right Side Area Light (Blender-style horizontal strip light illuminating passenger side, doors & wheels) */}
-      <group ref={rightSideGroupRef} position={[88, 28, 0]}>
-        <rectAreaLight
-          ref={rightSideAreaLightRef}
-          width={200}
-          height={32}
-          color="#fffcf8"
-          intensity={config.lightIntensity * 12.0}
-        />
-      </group>
-      <directionalLight
-        ref={rightSideDirectionalRef}
-        position={[88, 28, 0]}
-        intensity={config.lightIntensity * 1.6}
-        color="#fffcf8"
         castShadow={false}
       />
 
