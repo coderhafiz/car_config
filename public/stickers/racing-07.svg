@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e0e0e0"/>
+    </linearGradient>
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e62020"/>
+      <stop offset="100%" stop-color="#8a0000"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer border ring -->
+  <circle cx="256" cy="256" r="240" fill="#111114" stroke="url(#borderGrad)" stroke-width="22"/>
+  <circle cx="256" cy="256" r="216" fill="none" stroke="#ffffff" stroke-width="4" stroke-dasharray="16 8"/>
+  <circle cx="256" cy="256" r="198" fill="#1a1a20"/>
+  <!-- Racing Number 07 -->
+  <text x="256" y="325" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-size="210" fill="url(#grad1)" text-anchor="middle" letter-spacing="-8">07</text>
+  <!-- Top & Bottom text -->
+  <text x="256" y="115" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-size="32" fill="#e62020" text-anchor="middle" letter-spacing="8">MOTORSPORT</text>
+  <text x="256" y="420" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-size="28" fill="#a0a0b0" text-anchor="middle" letter-spacing="6">CUSTOM SPEC</text>
+</svg>

@@ -374,6 +374,7 @@ export default function Home() {
             {(showConfigurator || shouldEagerLoad) && (
               <ConfiguratorCanvas
                 config={config}
+                setConfig={setConfig}
                 onLoaded={() => setIsLoaded(true)}
                 isInitialLoading={!isLoaded}
                 isCollapsed={isCollapsed}

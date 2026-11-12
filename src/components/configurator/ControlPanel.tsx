@@ -1,9 +1,9 @@
 "use client";
 
-import { MODELS, ConfigState, preloadCarModel } from "./Model";
+import { MODELS, ConfigState, preloadCarModel, DEFAULT_STICKERS, DECAL_PRESETS, DecalConfig } from "./Model";
 import { Dispatch, SetStateAction, useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Eye, Sofa } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, Sofa, Upload, Trash2, Crosshair } from "lucide-react";
 import { useTheme } from "../ui/ThemeProvider";
 import { useSafari } from "@/hooks/useSafari";
 
@@ -411,6 +411,118 @@ export default function ControlPanel({
   );
 
   // Car selection: group by brand
+  const activeSticker = useMemo(() => {
+    const stickers = config.stickers || [];
+    return stickers.find((s) => s.id === config.activeStickerId) || stickers[0] || null;
+  }, [config.stickers, config.activeStickerId]);
+
+  const handleSelectSticker = (stickerId: string, url: string, name: string) => {
+    const carPresets = DECAL_PRESETS[config.selectedModel] || DECAL_PRESETS["audi-r8"];
+    const defaultPreset = carPresets.hood;
+
+    if (activeSticker) {
+      // Update active sticker texture
+      setConfig((prev) => ({
+        ...prev,
+        stickers: (prev.stickers || []).map((s) =>
+          s.id === activeSticker.id ? { ...s, textureUrl: url, name } : s
+        ),
+      }));
+    } else {
+      // Create new sticker on front hood
+      const newSticker: DecalConfig = {
+        id: `sticker-${stickerId}`,
+        name,
+        textureUrl: url,
+        position: [...defaultPreset.position],
+        rotation: [...defaultPreset.rotation],
+        scale: [...defaultPreset.scale],
+        preset: "hood",
+        mirrored: false,
+      };
+      setConfig((prev) => ({
+        ...prev,
+        stickers: [...(prev.stickers || []), newSticker],
+        activeStickerId: newSticker.id,
+      }));
+    }
+  };
+
+  const handleApplyPreset = (presetKey: "roof" | "hood" | "leftDoor" | "rightDoor") => {
+    if (!activeSticker) return;
+    const carPresets = DECAL_PRESETS[config.selectedModel] || DECAL_PRESETS["audi-r8"];
+    const preset = carPresets[presetKey];
+    if (!preset) return;
+
+    const isDoor = presetKey === "leftDoor" || presetKey === "rightDoor";
+
+    setConfig((prev) => ({
+      ...prev,
+      stickers: (prev.stickers || []).map((s) =>
+        s.id === activeSticker.id
+          ? {
+              ...s,
+              position: [...preset.position],
+              rotation: [...preset.rotation],
+              scale: [activeSticker.scale[0], activeSticker.scale[1], preset.scale[2]],
+              preset: presetKey,
+              mirrored: isDoor ? s.mirrored : false,
+            }
+          : s
+      ),
+    }));
+  };
+
+  const updateActiveSticker = (partial: Partial<DecalConfig>) => {
+    if (!activeSticker) return;
+    setConfig((prev) => ({
+      ...prev,
+      stickers: (prev.stickers || []).map((s) =>
+        s.id === activeSticker.id ? { ...s, ...partial } : s
+      ),
+    }));
+  };
+
+  const handleDeleteActiveSticker = () => {
+    if (!activeSticker) return;
+    setConfig((prev) => {
+      const next = (prev.stickers || []).filter((s) => s.id !== activeSticker.id);
+      return {
+        ...prev,
+        stickers: next,
+        activeStickerId: next[0]?.id || null,
+      };
+    });
+  };
+
+  const handleCustomStickerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      if (!dataUrl) return;
+      const carPresets = DECAL_PRESETS[config.selectedModel] || DECAL_PRESETS["audi-r8"];
+      const defaultPreset = carPresets.hood;
+      const newSticker: DecalConfig = {
+        id: `upload-${file.name.replace(/[^a-zA-Z0-9]/g, "")}-${file.size}`,
+        name: file.name.replace(/\.[^/.]+$/, ""),
+        textureUrl: dataUrl,
+        position: [...defaultPreset.position],
+        rotation: [...defaultPreset.rotation],
+        scale: [34, 34, 16],
+        preset: "hood",
+        mirrored: false,
+      };
+      setConfig((prev) => ({
+        ...prev,
+        stickers: [...(prev.stickers || []), newSticker],
+        activeStickerId: newSticker.id,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const brandGroups = useMemo(() => {
     const groups: Record<string, typeof MODELS> = {};
     MODELS.forEach((m) => {
@@ -532,6 +644,177 @@ export default function ControlPanel({
           metallic={true}
           onSelect={(hex) => setConfig((p) => ({ ...p, accentColor: hex }))}
         />
+      </Folder>
+
+      {/* ── Custom Stickers & Decals (three-mesh-bvh) ── */}
+      <Folder
+        key={`Decals-${isLandscape}`}
+        title="Custom Stickers & Decals"
+        defaultOpen={false}
+      >
+        <div className="space-y-3 pt-1 pb-2">
+          {/* Header & Upload Button */}
+          <div className="flex items-center justify-between text-xs text-text-sub font-medium">
+            <span>Sticker Gallery</span>
+            <label className="flex items-center gap-1.5 cursor-pointer text-brand hover:underline font-semibold text-[11px]">
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload Custom Logo</span>
+              <input
+                type="file"
+                accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleCustomStickerUpload}
+              />
+            </label>
+          </div>
+
+          {/* Curated Stickers Grid */}
+          <div className="grid grid-cols-4 gap-2">
+            {DEFAULT_STICKERS.map((st) => (
+              <button
+                key={st.id}
+                onClick={() => handleSelectSticker(st.id, st.url, st.name)}
+                className={`p-1.5 rounded-[4px] border flex flex-col items-center gap-1 transition-all ${
+                  activeSticker?.textureUrl === st.url
+                    ? "border-brand bg-brand/10 ring-1 ring-brand"
+                    : "border-border-glass glass glass-hover"
+                }`}
+                title={st.name}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={st.url}
+                  alt={st.name}
+                  className="w-10 h-10 object-contain drop-shadow"
+                />
+                <span className="text-[10px] text-text-sub truncate w-full text-center">
+                  {st.name.split(" ")[0]}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {activeSticker && (
+            <div className="mt-3 pt-3 border-t border-border-glass space-y-3">
+              {/* Preset Snapping (Top & Sides) */}
+              <div>
+                <span className="text-[11px] font-semibold text-text-sub uppercase tracking-wider block mb-1.5">
+                  Placement Presets
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => handleApplyPreset("roof")}
+                    className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center ${
+                      activeSticker.preset === "roof"
+                        ? "bg-brand text-white border-brand font-semibold"
+                        : "glass glass-hover border-border-glass text-text-main"
+                    }`}
+                  >
+                    Top (Roof)
+                  </button>
+                  <button
+                    onClick={() => handleApplyPreset("hood")}
+                    className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center ${
+                      activeSticker.preset === "hood"
+                        ? "bg-brand text-white border-brand font-semibold"
+                        : "glass glass-hover border-border-glass text-text-main"
+                    }`}
+                  >
+                    Front Hood
+                  </button>
+                  <button
+                    onClick={() => handleApplyPreset("leftDoor")}
+                    className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center ${
+                      activeSticker.preset === "leftDoor"
+                        ? "bg-brand text-white border-brand font-semibold"
+                        : "glass glass-hover border-border-glass text-text-main"
+                    }`}
+                  >
+                    Driver Door (Left)
+                  </button>
+                  <button
+                    onClick={() => handleApplyPreset("rightDoor")}
+                    className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center ${
+                      activeSticker.preset === "rightDoor"
+                        ? "bg-brand text-white border-brand font-semibold"
+                        : "glass glass-hover border-border-glass text-text-main"
+                    }`}
+                  >
+                    Passenger Door (Right)
+                  </button>
+                </div>
+              </div>
+
+              {/* BVH Surface Raycast Placement Button */}
+              <button
+                onClick={() =>
+                  setConfig((p) => ({
+                    ...p,
+                    stickerPlacementMode: !p.stickerPlacementMode,
+                  }))
+                }
+                className={`w-full py-2 px-3 text-xs rounded-[3px] border flex items-center justify-center gap-2 transition-all font-medium ${
+                  config.stickerPlacementMode
+                    ? "bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/30 animate-pulse"
+                    : "glass glass-hover border-border-glass text-text-main"
+                }`}
+              >
+                <Crosshair className="w-3.5 h-3.5" />
+                <span>
+                  {config.stickerPlacementMode
+                    ? "Click anywhere on vehicle body..."
+                    : "Click to Place / Drag on Body"}
+                </span>
+              </button>
+
+              {/* Size Slider */}
+              <SliderRow
+                label="Sticker Size"
+                value={activeSticker.scale[0]}
+                min={12}
+                max={60}
+                step={1}
+                onChange={(val) => {
+                  const ratio = activeSticker.scale[1] / activeSticker.scale[0] || 1;
+                  updateActiveSticker({
+                    scale: [val, Math.round(val * ratio), activeSticker.scale[2]],
+                  });
+                }}
+              />
+
+              {/* Rotation Slider */}
+              <SliderRow
+                label="Sticker Rotation"
+                value={Math.round((activeSticker.rotation[2] * 180) / Math.PI)}
+                min={-180}
+                max={180}
+                step={1}
+                onChange={(val) => {
+                  const rad = (val * Math.PI) / 180;
+                  updateActiveSticker({
+                    rotation: [activeSticker.rotation[0], activeSticker.rotation[1], rad],
+                  });
+                }}
+              />
+
+              {/* Mirror Toggle */}
+              <ToggleRow
+                label="Mirror to Opposite Door"
+                value={Boolean(activeSticker.mirrored)}
+                onChange={(v) => updateActiveSticker({ mirrored: v })}
+              />
+
+              {/* Remove button */}
+              <button
+                onClick={handleDeleteActiveSticker}
+                className="w-full py-1.5 text-xs text-red-500 hover:text-red-400 border border-red-500/20 hover:border-red-500/40 rounded-[3px] flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove Active Sticker</span>
+              </button>
+            </div>
+          )}
+        </div>
       </Folder>
 
       {/* ── View Settings ── */}

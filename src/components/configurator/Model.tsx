@@ -1,6 +1,8 @@
 "use client";
 
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useState } from "react";
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
+import { DecalGeometry } from "three-stdlib";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { easing } from "maath";
@@ -24,6 +26,9 @@ import {
   SRGBColorSpace,
   BufferAttribute,
   Color,
+  Euler,
+  Texture,
+  TextureLoader,
   PointLight,
   SpotLight,
   Cache,
@@ -32,9 +37,28 @@ import { DRACOLoader, KTX2Loader, GLTFLoader } from "three-stdlib";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { MeshoptDecoder } from "meshoptimizer";
 
+// Patch three-mesh-bvh acceleration prototypes once on client
+if (typeof window !== "undefined") {
+  (BufferGeometry.prototype as unknown as { computeBoundsTree: typeof computeBoundsTree }).computeBoundsTree = computeBoundsTree;
+  (BufferGeometry.prototype as unknown as { disposeBoundsTree: typeof disposeBoundsTree }).disposeBoundsTree = disposeBoundsTree;
+  Mesh.prototype.raycast = acceleratedRaycast;
+}
+
 const EMPTY_MATS: MeshPhysicalMaterial[] = [];
 
 // ─── Configuration types ──────────────────────────────────────────────────────
+
+export interface DecalConfig {
+  id: string;
+  name: string;
+  textureUrl: string;
+  position: [number, number, number];
+  rotation: [number, number, number]; // Euler [rx, ry, rz]
+  scale: [number, number, number];    // [width, height, depth]
+  mirrored?: boolean;                 // Symmetric mirror on opposite X side
+  preset?: "roof" | "hood" | "leftDoor" | "rightDoor" | "custom";
+  targetMeshName?: string;
+}
 
 export interface ConfigState {
   mainColor: string;
@@ -50,7 +74,63 @@ export interface ConfigState {
   selectedTexture: string;
   /** True when the selected exterior paint is a matte finish */
   mattePaint: boolean;
+  /** Active stickers / decals placed on vehicle body */
+  stickers?: DecalConfig[];
+  /** Active sticker currently selected for editing */
+  activeStickerId?: string | null;
+  /** When true, pointer click on car body projects/moves active sticker */
+  stickerPlacementMode?: boolean;
 }
+
+export const DEFAULT_STICKERS = [
+  { id: "racing-07", name: "Racing #07 Roundel", url: "/stickers/racing-07.svg" },
+  { id: "customly-racing", name: "Customly-U Motorsport", url: "/stickers/customly-racing.svg" },
+  { id: "apex-gt", name: "Apex GT Crest", url: "/stickers/apex-gt.svg" },
+  { id: "v8-twin-turbo", name: "V8 Twin Turbo", url: "/stickers/v8-twin-turbo.svg" },
+];
+
+export const DECAL_PRESETS: Record<string, Record<"roof" | "hood" | "leftDoor" | "rightDoor", {
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+}>> = {
+  "audi-r8": {
+    roof: { position: [0, 39, -6], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
+    hood: { position: [0, 26, 42], rotation: [Math.PI / 2.3, 0, 0], scale: [34, 34, 16] },
+    leftDoor: { position: [-38, 24, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
+    rightDoor: { position: [38, 24, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+  },
+  "porsche-911": {
+    roof: { position: [0, 42, -5], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
+    hood: { position: [0, 28, 48], rotation: [Math.PI / 2.2, 0, 0], scale: [34, 34, 16] },
+    leftDoor: { position: [-36, 25, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
+    rightDoor: { position: [36, 25, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+  },
+  "mercedes-amg": {
+    roof: { position: [0, 40, -8], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
+    hood: { position: [0, 26, 48], rotation: [Math.PI / 2.2, 0, 0], scale: [34, 34, 16] },
+    leftDoor: { position: [-38, 24, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
+    rightDoor: { position: [38, 24, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+  },
+  "chevrolet-corvette-c8": {
+    roof: { position: [0, 38, -6], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
+    hood: { position: [0, 25, 46], rotation: [Math.PI / 2.3, 0, 0], scale: [34, 34, 16] },
+    leftDoor: { position: [-38, 23, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
+    rightDoor: { position: [38, 23, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+  },
+  "audi-rs6": {
+    roof: { position: [0, 41, 0], rotation: [Math.PI / 2, 0, 0], scale: [38, 38, 16] },
+    hood: { position: [0, 27, 50], rotation: [Math.PI / 2.3, 0, 0], scale: [34, 34, 16] },
+    leftDoor: { position: [-38, 24, 0], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
+    rightDoor: { position: [38, 24, 0], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+  },
+  "lamborghini-revuelto": {
+    roof: { position: [0, 38, -6], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
+    hood: { position: [0, 24, 46], rotation: [Math.PI / 2.3, 0, 0], scale: [34, 34, 16] },
+    leftDoor: { position: [-38, 24, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
+    rightDoor: { position: [38, 24, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+  },
+};
 
 export const TEXTURES = [
   { id: "none", name: "Smooth Solid" },
@@ -1668,6 +1748,134 @@ interface ProcessedCarScene {
 
 const processedCarSceneCache = new Map<string, ProcessedCarScene>();
 
+function findBestBodyMesh(
+  bodyMeshes: Mesh[],
+  pos: [number, number, number],
+  meshName?: string
+): Mesh | null {
+  if (bodyMeshes.length === 0) return null;
+  if (meshName) {
+    const named = bodyMeshes.find((m) => m.name === meshName);
+    if (named) return named;
+  }
+  const v = new Vector3(...pos);
+  let bestDist = Infinity;
+  let bestMesh = bodyMeshes[0];
+  const box = new Box3();
+
+  for (let i = 0; i < bodyMeshes.length; i++) {
+    const m = bodyMeshes[i];
+    box.setFromObject(m);
+    const dist = box.distanceToPoint(v);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestMesh = m;
+    }
+  }
+  return bestMesh;
+}
+
+function DecalItem({
+  bodyMesh,
+  decal,
+  mattePaint,
+}: {
+  bodyMesh: Mesh;
+  decal: DecalConfig;
+  mattePaint: boolean;
+}) {
+  const [texture, setTexture] = useState<Texture | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const loader = new TextureLoader();
+    loader.load(decal.textureUrl, (tex) => {
+      if (!active) return;
+      tex.colorSpace = SRGBColorSpace;
+      tex.needsUpdate = true;
+      setTexture(tex);
+    });
+    return () => {
+      active = false;
+    };
+  }, [decal.textureUrl]);
+
+  const geometry = useMemo(() => {
+    if (!bodyMesh) return null;
+    try {
+      const pos = new Vector3(...decal.position);
+      const rot = new Euler(...decal.rotation);
+      const size = new Vector3(...decal.scale);
+      return new DecalGeometry(bodyMesh, pos, rot, size);
+    } catch {
+      return null;
+    }
+  }, [bodyMesh, decal.position, decal.rotation, decal.scale]);
+
+  if (!geometry || !texture) return null;
+
+  return (
+    <mesh geometry={geometry}>
+      <meshPhysicalMaterial
+        map={texture}
+        transparent
+        alphaTest={0.01}
+        roughness={mattePaint ? 0.9 : 0.18}
+        clearcoat={mattePaint ? 0.0 : 0.8}
+        clearcoatRoughness={0.04}
+        polygonOffset
+        polygonOffsetFactor={-4}
+        polygonOffsetUnits={-4}
+        depthWrite={false}
+        depthTest={true}
+      />
+    </mesh>
+  );
+}
+
+export function CarDecals({
+  stickers,
+  bodyMeshes,
+  mattePaint,
+}: {
+  stickers: DecalConfig[];
+  bodyMeshes: Mesh[];
+  mattePaint: boolean;
+}) {
+  if (!stickers || stickers.length === 0 || !bodyMeshes || bodyMeshes.length === 0) {
+    return null;
+  }
+
+  return (
+    <group>
+      {stickers.map((st) => {
+        const targetMesh = findBestBodyMesh(bodyMeshes, st.position, st.targetMeshName);
+        if (!targetMesh) return null;
+
+        return (
+          <group key={st.id}>
+            <DecalItem bodyMesh={targetMesh} decal={st} mattePaint={mattePaint} />
+            {st.mirrored && (
+              <DecalItem
+                bodyMesh={
+                  findBestBodyMesh(bodyMeshes, [-st.position[0], st.position[1], st.position[2]]) || targetMesh
+                }
+                decal={{
+                  ...st,
+                  id: `${st.id}-mirrored`,
+                  position: [-st.position[0], st.position[1], st.position[2]],
+                  rotation: [st.rotation[0], -st.rotation[1], -st.rotation[2]],
+                }}
+                mattePaint={mattePaint}
+              />
+            )}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 // ─── Model component ──────────────────────────────────────────────────────────
 
 export function Model({
@@ -1675,11 +1883,13 @@ export function Model({
   onFirstPaint,
   carRotationRef,
   isDraggingCarRef,
+  onPlacementHit,
 }: {
   config: ConfigState;
   onFirstPaint?: () => void;
   carRotationRef?: React.MutableRefObject<number>;
   isDraggingCarRef?: React.MutableRefObject<boolean>;
+  onPlacementHit?: (position: [number, number, number], rotation: [number, number, number], meshName?: string) => void;
 }) {
   "use no memo";
   const { gl } = useThree();
@@ -1699,6 +1909,7 @@ export function Model({
 
     const paintSet = new Set<MeshPhysicalMaterial>();
     const accentSet = new Set<MeshPhysicalMaterial>();
+    const bodyMeshes: Mesh[] = [];
     const clonedByOrig = new Map<MeshStandardMaterial, MeshPhysicalMaterial>();
     const specialClones = new Map<string, MeshPhysicalMaterial>();
     const dedupedStaticMats = new Map<string, MeshPhysicalMaterial>();
@@ -1898,6 +2109,16 @@ export function Model({
               mat.clearcoatRoughness = 0.04;
               mat.envMapIntensity = 1.25;
               paintSet.add(mat);
+              if (!bodyMeshes.includes(child)) {
+                bodyMeshes.push(child);
+                if (child.geometry && !(child.geometry as BufferGeometry & { boundsTree?: unknown }).boundsTree) {
+                  try {
+                    (child.geometry as BufferGeometry & { computeBoundsTree?: () => void }).computeBoundsTree?.();
+                  } catch {
+                    // Ignore non-manifold edges
+                  }
+                }
+              }
             } else if (cat === "accent") {
               applyMetallicWheelFinish(mat);
             } else {
@@ -2050,6 +2271,7 @@ export function Model({
 
     root.userData.paintMaterials = Array.from(paintSet);
     root.userData.accentMaterials = Array.from(accentSet);
+    root.userData.bodyMeshes = bodyMeshes;
 
     const processed: ProcessedCarScene = {
       scene: root,
@@ -2269,10 +2491,50 @@ export function Model({
     }
   });
 
+  const bodyMeshes = (scene?.userData?.bodyMeshes as Mesh[]) || [];
+
   return (
-    <group ref={wrapperRef} scale={0}>
+    <group
+      ref={wrapperRef}
+      scale={0}
+      onPointerDown={(e) => {
+        if (!config.stickerPlacementMode) return;
+        e.stopPropagation();
+
+        const hit = e.intersections.find((i) =>
+          bodyMeshes.some((bm) => bm === i.object)
+        );
+        if (!hit || !hit.face) return;
+
+        // Convert world hit point & normal into local car coordinates via BVH
+        const localPoint = wrapperRef.current.worldToLocal(hit.point.clone());
+        const worldNormal = hit.face.normal
+          .clone()
+          .transformDirection(hit.object.matrixWorld);
+        const localNormal = worldNormal.clone().applyQuaternion(
+          wrapperRef.current.quaternion.clone().invert()
+        );
+
+        const dummy = new Object3D();
+        dummy.position.copy(localPoint);
+        dummy.lookAt(localPoint.clone().add(localNormal));
+
+        if (onPlacementHit) {
+          onPlacementHit(
+            [localPoint.x, localPoint.y, localPoint.z],
+            [dummy.rotation.x, dummy.rotation.y, dummy.rotation.z],
+            hit.object.name
+          );
+        }
+      }}
+    >
       <primitive object={scene} dispose={null} />
       {contactShadowMesh && <primitive object={contactShadowMesh} dispose={null} />}
+      <CarDecals
+        stickers={config.stickers || []}
+        bodyMeshes={bodyMeshes}
+        mattePaint={Boolean(config.mattePaint)}
+      />
     </group>
   );
 }

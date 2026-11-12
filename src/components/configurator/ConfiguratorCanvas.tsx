@@ -40,6 +40,7 @@ interface ConfiguratorCanvasProps {
   config: ConfigState;
   isInitialLoading?: boolean;
   isCollapsed: boolean;
+  setConfig?: React.Dispatch<React.SetStateAction<ConfigState>>;
 }
 
 function CanvasLoader({ hidden }: { hidden?: boolean }) {
@@ -74,6 +75,7 @@ function SceneContent({
   isCollapsed,
   carRotationRef,
   isDraggingCarRef,
+  onPlacementHit,
 }: {
   config: ConfigState;
   onLoaded: () => void;
@@ -81,6 +83,7 @@ function SceneContent({
   isCollapsed: boolean;
   carRotationRef: React.MutableRefObject<number>;
   isDraggingCarRef: React.MutableRefObject<boolean>;
+  onPlacementHit?: (position: [number, number, number], rotation: [number, number, number], meshName?: string) => void;
 }) {
   const { size } = useThree();
   const isMobile = size.width < 640;
@@ -214,6 +217,9 @@ function SceneContent({
   const planeLightGroupRef = useRef<THREE.Group>(null!);
   const planeLightRef = useRef<THREE.RectAreaLight>(null!);
   const planeDirectionalRef = useRef<THREE.DirectionalLight>(null!);
+  const rightSideGroupRef = useRef<THREE.Group>(null!);
+  const rightSideAreaLightRef = useRef<THREE.RectAreaLight>(null!);
+  const rightSideDirectionalRef = useRef<THREE.DirectionalLight>(null!);
   const ambientLightRef = useRef<THREE.AmbientLight>(null!);
   const interiorFillRef = useRef<THREE.PointLight>(null!);
 
@@ -226,6 +232,13 @@ function SceneContent({
     if (planeDirectionalRef.current) {
       planeDirectionalRef.current.target.position.set(0, 20, 0);
       planeDirectionalRef.current.target.updateMatrixWorld();
+    }
+    if (rightSideGroupRef.current) {
+      rightSideGroupRef.current.lookAt(0, 22, 0);
+    }
+    if (rightSideDirectionalRef.current) {
+      rightSideDirectionalRef.current.target.position.set(0, 22, 0);
+      rightSideDirectionalRef.current.target.updateMatrixWorld();
     }
   }, []);
 
@@ -246,6 +259,8 @@ function SceneContent({
     if (superloopFrontRef.current) superloopFrontRef.current.intensity = 0;
     if (planeLightRef.current) planeLightRef.current.intensity = 0;
     if (planeDirectionalRef.current) planeDirectionalRef.current.intensity = 0;
+    if (rightSideAreaLightRef.current) rightSideAreaLightRef.current.intensity = 0;
+    if (rightSideDirectionalRef.current) rightSideDirectionalRef.current.intensity = 0;
     if (ambientLightRef.current) ambientLightRef.current.intensity = 0;
     if (interiorFillRef.current) interiorFillRef.current.intensity = 0;
     gl.shadowMap.needsUpdate = true;
@@ -281,6 +296,16 @@ function SceneContent({
     const targetPlaneDir = config.lightIntensity * 2.2 * studioMultiplier;
     if (planeDirectionalRef.current && Math.abs(planeDirectionalRef.current.intensity - targetPlaneDir) > 0.01) {
       easing.damp(planeDirectionalRef.current, "intensity", targetPlaneDir, 0.25, delta);
+    }
+
+    // Passenger side fill area light (completely invisible emitter source illuminating flank & wheels)
+    const targetSideArea = config.lightIntensity * 12.0 * studioMultiplier;
+    const targetSideDir = config.lightIntensity * 1.5 * studioMultiplier;
+    if (rightSideAreaLightRef.current && Math.abs(rightSideAreaLightRef.current.intensity - targetSideArea) > 0.05) {
+      easing.damp(rightSideAreaLightRef.current, "intensity", targetSideArea, 0.25, delta);
+    }
+    if (rightSideDirectionalRef.current && Math.abs(rightSideDirectionalRef.current.intensity - targetSideDir) > 0.01) {
+      easing.damp(rightSideDirectionalRef.current, "intensity", targetSideDir, 0.25, delta);
     }
 
     // Ambient studio bounce so sculpt lines and shadows are distinct and never pitch black
@@ -446,6 +471,24 @@ function SceneContent({
         castShadow={false}
       />
 
+      {/* Passenger Side Fill Area Light (Blender-style studio softbox fill, invisible emitter with zero viewport geometry) */}
+      <group ref={rightSideGroupRef} position={[135, 35, 10]}>
+        <rectAreaLight
+          ref={rightSideAreaLightRef}
+          width={180}
+          height={40}
+          color="#fffcf8"
+          intensity={config.lightIntensity * 12.0}
+        />
+      </group>
+      <directionalLight
+        ref={rightSideDirectionalRef}
+        position={[135, 35, 10]}
+        intensity={config.lightIntensity * 1.5}
+        color="#fffcf8"
+        castShadow={false}
+      />
+
       <ambientLight
         ref={ambientLightRef}
         intensity={config.lightIntensity * 0.25}
@@ -506,6 +549,7 @@ function SceneContent({
           onFirstPaint={onLoaded}
           carRotationRef={carRotationRef}
           isDraggingCarRef={isDraggingCarRef}
+          onPlacementHit={onPlacementHit}
         />
       </Suspense>
     </>
@@ -517,8 +561,41 @@ export default function ConfiguratorCanvas({
   config,
   isInitialLoading = false,
   isCollapsed,
+  setConfig,
 }: ConfiguratorCanvasProps) {
   const carRotationRef = useRef(config.rotationY);
+
+  const handlePlacementHit = (
+    pos: [number, number, number],
+    rot: [number, number, number],
+    meshName?: string
+  ) => {
+    if (!setConfig) return;
+    setConfig((prev) => {
+      const stickers = prev.stickers || [];
+      const activeId = prev.activeStickerId || stickers[0]?.id;
+      if (!activeId) return prev;
+
+      const updated = stickers.map((s) => {
+        if (s.id === activeId) {
+          return {
+            ...s,
+            position: pos,
+            rotation: rot,
+            targetMeshName: meshName,
+            preset: "custom" as const,
+          };
+        }
+        return s;
+      });
+
+      return {
+        ...prev,
+        stickers: updated,
+        stickerPlacementMode: false,
+      };
+    });
+  };
   const isDraggingCarRef = useRef(false);
   const lastPointerXRef = useRef(0);
   const [isMobileViewport] = useState(
@@ -531,6 +608,10 @@ export default function ConfiguratorCanvas({
   const canDragRotateCar = config.viewMode === "exterior";
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (config.stickerPlacementMode) {
+      // Allow 3D canvas Raycast to receive click for BVH decal placement
+      return;
+    }
     if (e.button !== 0 || !canDragRotateCar) return;
     isDraggingCarRef.current = true;
     lastPointerXRef.current = e.clientX;
@@ -562,7 +643,7 @@ export default function ConfiguratorCanvas({
   return (
     <div
       className={`relative w-full h-full touch-none select-none ${
-        canDragRotateCar ? "cursor-grab active:cursor-grabbing" : ""
+        config.stickerPlacementMode ? "cursor-crosshair" : canDragRotateCar ? "cursor-grab active:cursor-grabbing" : ""
       }`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -605,6 +686,7 @@ export default function ConfiguratorCanvas({
             isCollapsed={isCollapsed}
             carRotationRef={carRotationRef}
             isDraggingCarRef={isDraggingCarRef}
+            onPlacementHit={handlePlacementHit}
           />
         </Suspense>
       </Canvas>

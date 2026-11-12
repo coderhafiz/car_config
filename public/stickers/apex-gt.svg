@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="neonOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff7700"/>
+      <stop offset="100%" stop-color="#ff1100"/>
+    </linearGradient>
+  </defs>
+  <!-- Chevron Crest -->
+  <polygon points="256,40 470,160 470,360 256,480 42,360 42,160" fill="#0b0b0e" stroke="url(#neonOrange)" stroke-width="14"/>
+  <!-- Apex Arrow Chevrons -->
+  <path d="M256,110 L380,210 L350,230 L256,155 L162,230 L132,210 Z" fill="url(#neonOrange)"/>
+  <path d="M256,190 L380,290 L350,310 L256,235 L162,310 L132,290 Z" fill="#ffffff"/>
+  <!-- GT text -->
+  <text x="256" y="415" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-size="88" fill="#ffffff" text-anchor="middle" letter-spacing="8">APEX GT</text>
+</svg>

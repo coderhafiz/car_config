@@ -20,6 +20,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "three": "^0.184.0",
+    "three-mesh-bvh": "^0.9.18",
     "three-stdlib": "^2.36.1"
   },
   "devDependencies": {

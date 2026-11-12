@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" width="800" height="300">
+  <defs>
+    <linearGradient id="flagGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e62020"/>
+      <stop offset="50%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#1a73e8"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Badge shape -->
+  <polygon points="40,20 780,20 740,280 0,280" fill="#0d0e12" stroke="#ffffff" stroke-width="6"/>
+  <!-- Racing stripes -->
+  <polygon points="60,35 110,35 70,265 20,265" fill="#e62020"/>
+  <polygon points="120,35 170,35 130,265 80,265" fill="#ffffff"/>
+  <polygon points="180,35 230,35 190,265 140,265" fill="#1a73e8"/>
+  <!-- Brand Name -->
+  <text x="460" y="165" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-size="92" fill="#ffffff" text-anchor="middle" letter-spacing="4" font-style="italic">CUSTOMLY-U</text>
+  <text x="460" y="235" font-family="Arial Black, Impact, sans-serif" font-weight="900" font-size="34" fill="url(#flagGrad)" text-anchor="middle" letter-spacing="14">PERFORMANCE</text>
+</svg>
