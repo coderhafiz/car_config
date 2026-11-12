@@ -2632,7 +2632,7 @@ export function Showroom({
   }, []);
 
   useFrame((state, delta) => {
-    const targetEmissive = lightIntensity * 2.5;
+    const targetEmissive = lightIntensity * 4.5;
     const showroomRoot = showroomGroupRef.current?.children[0];
 
     const emissiveMats = (showroomRoot?.userData?.emissiveMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;

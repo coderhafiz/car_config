@@ -211,6 +211,7 @@ function SceneContent({
 
   const superloopSpotRef = useRef<THREE.SpotLight>(null!);
   const superloopCenterRef = useRef<THREE.PointLight>(null!);
+  const superloopFrontRef = useRef<THREE.SpotLight>(null!);
   const ambientLightRef = useRef<THREE.AmbientLight>(null!);
   const interiorFillRef = useRef<THREE.PointLight>(null!);
 
@@ -219,7 +220,7 @@ function SceneContent({
   useEffect(() => {
     const renderer = gl as THREE.WebGLRenderer;
     renderer.toneMapping = THREE.AgXToneMapping;
-    renderer.toneMappingExposure = 1.25;
+    renderer.toneMappingExposure = 1.35;
     gl.shadowMap.autoUpdate = false;
     gl.shadowMap.needsUpdate = true;
     return () => {
@@ -230,6 +231,7 @@ function SceneContent({
   useEffect(() => {
     if (superloopSpotRef.current) superloopSpotRef.current.intensity = 0;
     if (superloopCenterRef.current) superloopCenterRef.current.intensity = 0;
+    if (superloopFrontRef.current) superloopFrontRef.current.intensity = 0;
     if (ambientLightRef.current) ambientLightRef.current.intensity = 0;
     if (interiorFillRef.current) interiorFillRef.current.intensity = 0;
     gl.shadowMap.needsUpdate = true;
@@ -242,17 +244,23 @@ function SceneContent({
     const studioMultiplier = isInterior ? 1.85 : 1.0;
     const ambientMultiplier = isInterior ? 4.2 : 1.0;
 
-    // Smooth light fade-in & Studio Light control for Superloop Light 200 (gated to rest on idle frames)
-    const targetSpot = config.lightIntensity * 1.1 * studioMultiplier;
+    // Powerful downward illumination from Superloop Light 200 ring directly onto vehicle
+    const targetSpot = config.lightIntensity * 7.5 * studioMultiplier;
     if (superloopSpotRef.current && Math.abs(superloopSpotRef.current.intensity - targetSpot) > 0.005) {
       easing.damp(superloopSpotRef.current, "intensity", targetSpot, 0.25, delta);
     }
-    // Consolidated overhead studio point light (replaces 5 separate ceiling pointLights)
-    const targetCenter = config.lightIntensity * 3.2 * studioMultiplier;
+    // Strong overhead studio flood emitted from inside the ring light
+    const targetCenter = config.lightIntensity * 16.0 * studioMultiplier;
     if (superloopCenterRef.current && Math.abs(superloopCenterRef.current.intensity - targetCenter) > 0.005) {
       easing.damp(superloopCenterRef.current, "intensity", targetCenter, 0.25, delta);
     }
-    const targetAmbient = config.lightIntensity * 0.25 * ambientMultiplier;
+    // Front studio fill from the front ring light arc to illuminate the front hood, grille, and headlights
+    const targetFront = config.lightIntensity * 6.5 * studioMultiplier;
+    if (superloopFrontRef.current && Math.abs(superloopFrontRef.current.intensity - targetFront) > 0.005) {
+      easing.damp(superloopFrontRef.current, "intensity", targetFront, 0.25, delta);
+    }
+    // Ambient studio bounce so sculpt lines and shadows are distinct and never pitch black
+    const targetAmbient = config.lightIntensity * 0.45 * ambientMultiplier;
     if (ambientLightRef.current && Math.abs(ambientLightRef.current.intensity - targetAmbient) > 0.005) {
       easing.damp(ambientLightRef.current, "intensity", targetAmbient, 0.25, delta);
     }
@@ -406,26 +414,41 @@ function SceneContent({
         intensity={config.lightIntensity * 0.25}
       />
 
-      {/* Scene lights emitted directly from the Superloop Light 200 ring (y = 130, radius = 79.2) */}
+      {/* Key studio spotlight focused directly downward from Superloop Light 200 */}
       <spotLight
         ref={superloopSpotRef}
         position={[0, 130, 0]}
-        angle={Math.PI / 1.75}
-        penumbra={1}
-        decay={0}
-        intensity={config.lightIntensity * 1.1}
+        angle={Math.PI / 2.6}
+        penumbra={0.7}
+        decay={0.2}
+        distance={300}
+        intensity={config.lightIntensity * 7.5}
         color="#fffaf2"
         castShadow
         shadow-mapSize={isMobile ? [1024, 1024] : [2048, 2048]}
         shadow-bias={-0.0004}
       />
 
+      {/* Powerful overhead studio flood emitted from inside the ring light */}
       <pointLight
         ref={superloopCenterRef}
-        position={[0, 128, 0]}
-        intensity={config.lightIntensity * 3.2}
+        position={[0, 126, 0]}
+        distance={300}
+        decay={0.25}
+        intensity={config.lightIntensity * 16.0}
         color="#fffaf2"
-        decay={0.35}
+      />
+
+      {/* Front-angled studio fill from front ring arc to brightly light the hood, headlights & grille */}
+      <spotLight
+        ref={superloopFrontRef}
+        position={[0, 126, 75]}
+        angle={Math.PI / 2.8}
+        penumbra={0.8}
+        decay={0.25}
+        distance={300}
+        intensity={config.lightIntensity * 6.5}
+        color="#fffaf2"
       />
 
       {/* Interior cabin fill light: illuminates steering wheel, dashboard & cabin leather */}
