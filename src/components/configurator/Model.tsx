@@ -412,7 +412,7 @@ let dracoLoader: DRACOLoader | null = null;
 let ktx2Loader: KTX2Loader | null = null;
 let persistentCacheInitialized = false;
 
-const ASSET_CACHE_NAME = "customly-u-3d-assets-v7";
+const ASSET_CACHE_NAME = "customly-u-3d-assets-v8";
 const CACHEABLE_ASSET_PREFIXES = ["/cars/", "/draco/", "/basis/", "/hdri/", "/textures/"];
 const inFlightAssetFetches = new Map<string, Promise<Response>>();
 
@@ -495,6 +495,7 @@ function ensurePersistentAssetCache() {
         const cache = await window.caches.open(ASSET_CACHE_NAME);
         const cachedResponse = await cache.match(cacheKey, { ignoreVary: true });
         if (cachedResponse) {
+          console.log("[AssetCache] Serving saved 3D asset from cache:", cacheKey);
           return cachedResponse.clone();
         }
 
@@ -590,7 +591,7 @@ export function PreloadModels() {
 
     if (isMobileDevice || isDataConstrained) return;
 
-    // 1. High-priority preload: Showroom + initial default car (Audi R8)
+    // 1. High-priority preload: Showroom + CustomlyDrasonLogo + saved/default car model
     //    Gets 100% of browser connections without network contention
     useGLTF.preload("/cars/ShowRoom.glb", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
@@ -598,7 +599,20 @@ export function PreloadModels() {
     useGLTF.preload("/cars/CustomlyDrasonLogo.glb", "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
-    useGLTF.preload(MODELS[0].url, "/draco/", true, (loader) =>
+
+    // Check if user previously saved a model preference on a prior visit
+    let initialModelUrl = MODELS[0].url;
+    try {
+      const savedStr = window.localStorage.getItem("customly_saved_car_config");
+      if (savedStr) {
+        const saved = JSON.parse(savedStr);
+        const matched = MODELS.find((m) => m.id === saved.selectedModel);
+        if (matched) initialModelUrl = matched.url;
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    useGLTF.preload(initialModelUrl, "/draco/", true, (loader) =>
       setupLoaders(loader as GLTFLoader, gl)
     );
 
@@ -2353,7 +2367,56 @@ function createMatteWhiteShowroomTextures(): {
   return { diffuseMap, bumpMap };
 }
 
-export function Showroom({ lightIntensity }: { lightIntensity: number }) {
+/**
+ * Computes the reactive showroom interior wall and atmosphere color based on the
+ * current vehicle body paint.
+ * - Dark / Stealth paints (e.g. Obsidian Black): deep dramatic studio charcoal/black
+ * - High-key / White paints: clean, bright architectural gallery white
+ * - Chromatic paints (Java Green, Misano Red, Navarra Blue, Sambarot Orange):
+ *   sophisticated architectural studio tint harmonizing with the car's body color.
+ */
+function getShowroomColorForCar(carHex: string): Color {
+  const c = new Color(carHex);
+  const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+  const result = new Color();
+
+  if (lum < 0.12) {
+    // Dark / stealth paint: dark studio charcoal with subtle tint of car hue
+    const baseDark = 0.13 + lum * 0.4;
+    result.setRGB(
+      baseDark * 0.82 + c.r * 0.18,
+      baseDark * 0.82 + c.g * 0.18,
+      baseDark * 0.82 + c.b * 0.18
+    );
+  } else if (lum > 0.75) {
+    // Bright / white paint: clean, crisp gallery off-white
+    const baseLight = 0.78 + (lum - 0.75) * 0.45;
+    result.setRGB(
+      baseLight * 0.88 + c.r * 0.12,
+      baseLight * 0.88 + c.g * 0.12,
+      baseLight * 0.88 + c.b * 0.12
+    );
+  } else {
+    // Chromatic / mid-tone paint: luxury architectural studio tint
+    // Neutral mid-gray base (~0.44) blended with 38% car color
+    const baseGray = 0.44;
+    result.setRGB(
+      baseGray * 0.62 + c.r * 0.38,
+      baseGray * 0.62 + c.g * 0.38,
+      baseGray * 0.62 + c.b * 0.38
+    );
+  }
+
+  return result;
+}
+
+export function Showroom({
+  lightIntensity,
+  mainColor = "#0a0a0a",
+}: {
+  lightIntensity: number;
+  mainColor?: string;
+}) {
   const { gl } = useThree();
 
   const gltfResult = useGLTF(
@@ -2541,6 +2604,7 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
 
     root.scale.setScalar(1);
     root.position.set(...SHOWROOM_OFFSET);
+    root.userData.cubeInteriorMat = cubeInteriorMat;
     root.userData.logoMaterials = logoMats;
     root.userData.emissiveMaterials = Array.from(emissiveSet);
     return {
@@ -2552,6 +2616,12 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
   const logoLightRef = useRef<PointLight>(null);
   const logoSpotRef = useRef<SpotLight>(null);
   const logoWashRef = useRef<PointLight>(null);
+  const studioBounceRef = useRef<PointLight>(null);
+
+  const targetWallColor = useMemo(
+    () => getShowroomColorForCar(mainColor),
+    [mainColor]
+  );
 
   useEffect(() => {
     if (logoSpotRef.current) {
@@ -2595,6 +2665,18 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
       logoWashRef.current.color.set("#ffffff");
       easing.damp(logoWashRef.current, "intensity", lightIntensity * 5.5, 0.2, delta);
     }
+
+    // Dynamically damp the showroom walls to match the vehicle's body color
+    const cubeMat = showroomRoot?.userData?.cubeInteriorMat as MeshPhysicalMaterial | undefined;
+    if (cubeMat) {
+      easing.dampC(cubeMat.color, targetWallColor, 0.25, delta);
+    }
+
+    // Soft car-colored ambient bounce in the studio
+    if (studioBounceRef.current) {
+      easing.dampC(studioBounceRef.current.color, targetWallColor, 0.25, delta);
+      easing.damp(studioBounceRef.current, "intensity", lightIntensity * 2.8, 0.2, delta);
+    }
   });
 
   return (
@@ -2632,6 +2714,16 @@ export function Showroom({ lightIntensity }: { lightIntensity: number }) {
         decay={1.0}
         intensity={lightIntensity * 5.5}
         color="#ffffff"
+      />
+
+      {/* Soft indirect studio floor and wall bounce matching vehicle color theme */}
+      <pointLight
+        ref={studioBounceRef}
+        position={[0, 18, 0]}
+        distance={380}
+        decay={1.2}
+        intensity={lightIntensity * 2.8}
+        color={targetWallColor}
       />
     </>
   );

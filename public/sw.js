@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "customly-u-3d-assets-";
-const CACHE_NAME = `${CACHE_PREFIX}v7`;
+const CACHE_NAME = `${CACHE_PREFIX}v8`;
 
 const CRITICAL_DECODERS = [
   "/draco/draco_decoder.js",
@@ -82,6 +82,7 @@ self.addEventListener("fetch", (event) => {
         ignoreVary: true,
       });
       if (cachedResponse) {
+        console.log("[ServiceWorker] Serving saved 3D asset from cache:", request.url);
         return cachedResponse;
       }
 
@@ -93,6 +94,7 @@ self.addEventListener("fetch", (event) => {
             if (response && response.status === 200 && response.ok) {
               try {
                 await cache.put(request, response.clone());
+                console.log("[ServiceWorker] Saved 3D asset to persistent cache:", request.url);
               } catch {
                 // Ignore quota errors if device disk is completely full
               }

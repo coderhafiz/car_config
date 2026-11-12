@@ -10,6 +10,8 @@ import { ConfigState, MODELS } from "@/components/configurator/Model";
 import { Sparkles, Share2 } from "lucide-react";
 import { useSafari } from "@/hooks/useSafari";
 
+const LOCAL_STORAGE_CONFIG_KEY = "customly_saved_car_config";
+
 export default function Home() {
   const isSafari = useSafari();
 
@@ -73,32 +75,69 @@ export default function Home() {
     };
   });
 
-  // Apply a shared configuration from the URL (?config=...) after mount
+  // Restore saved car model & configuration on subsequent visits (or apply ?config=... if shared)
   useEffect(() => {
-    const sharedConfig = new URLSearchParams(window.location.search).get(
-      "config",
-    );
-    if (!sharedConfig) return;
-
-    let decoded: Partial<ConfigState> = {};
     try {
-      decoded = JSON.parse(atob(sharedConfig));
-    } catch (e) {
-      console.error("Failed to parse shared config", e);
-    }
-    if (
-      decoded.selectedModel &&
-      !MODELS.some((m) => m.id === decoded.selectedModel)
-    ) {
-      delete decoded.selectedModel;
-    }
+      const urlParams = new URLSearchParams(window.location.search);
+      const sharedConfig = urlParams.get("config");
 
-    const timer = setTimeout(() => {
-      setConfig((prev) => ({ ...prev, ...decoded }));
-      setShowConfigurator(true);
-    }, 0);
-    return () => clearTimeout(timer);
+      if (sharedConfig) {
+        let decoded: Partial<ConfigState> = {};
+        try {
+          decoded = JSON.parse(atob(sharedConfig));
+        } catch (e) {
+          console.error("Failed to parse shared config", e);
+        }
+        if (
+          decoded.selectedModel &&
+          !MODELS.some((m) => m.id === decoded.selectedModel)
+        ) {
+          delete decoded.selectedModel;
+        }
+        const timer = setTimeout(() => {
+          setConfig((prev) => ({ ...prev, ...decoded }));
+          setShowConfigurator(true);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+
+      // Check localStorage for previously saved 3D car model & options
+      const savedStr = window.localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
+      if (savedStr) {
+        const saved = JSON.parse(savedStr) as Partial<ConfigState>;
+        if (
+          saved &&
+          saved.selectedModel &&
+          MODELS.some((m) => m.id === saved.selectedModel)
+        ) {
+          console.log(
+            "[Config] Restoring saved 3D car model from prior visit:",
+            saved.selectedModel
+          );
+          const timer = setTimeout(() => {
+            setConfig((prev) => ({ ...prev, ...saved }));
+          }, 0);
+          return () => clearTimeout(timer);
+        }
+      }
+    } catch {
+      // Ignore storage errors in private browsing
+    }
   }, []);
+
+  // Persist the user's chosen 3D car model and customizations for subsequent visits
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(
+          LOCAL_STORAGE_CONFIG_KEY,
+          JSON.stringify(config)
+        );
+      }
+    } catch {
+      // Ignore quota errors
+    }
+  }, [config]);
 
   const selectedModelInfo = useMemo(
     () => MODELS.find((m) => m.id === config.selectedModel) || MODELS[0],
