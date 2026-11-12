@@ -70,7 +70,6 @@ export default function Home() {
       viewMode: "exterior",
       selectedTexture: "leather",
       mattePaint: false,
-      selectedShowroom: "showroom-1",
     };
   });
 

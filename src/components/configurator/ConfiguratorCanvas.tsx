@@ -440,10 +440,7 @@ function SceneContent({
       />
 
       <Suspense fallback={<CanvasLoader hidden={isInitialLoading} />}>
-        <Showroom
-          lightIntensity={config.lightIntensity}
-          selectedShowroom={config.selectedShowroom}
-        />
+        <Showroom lightIntensity={config.lightIntensity} />
         <Model
           config={config}
           onFirstPaint={onLoaded}

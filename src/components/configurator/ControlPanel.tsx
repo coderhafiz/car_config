@@ -540,69 +540,6 @@ export default function ControlPanel({
         title="Environment"
         defaultOpen={!isLandscape}
       >
-        <div
-          className="px-3 py-2.5 mb-2 rounded-[3px]"
-          style={{
-            background: isDark
-              ? "rgba(9, 18, 23, 0.45)"
-              : "rgba(255, 255, 255, 0.55)",
-            border: "1px solid var(--glass-border)",
-          }}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span
-              className="text-[10px] font-semibold uppercase tracking-[0.16em]"
-              style={{
-                color: isDark ? "rgba(210,226,234,0.7)" : "rgba(11,20,24,0.65)",
-              }}
-            >
-              Showroom Space
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {(
-              [
-                { id: "showroom-1", label: "Showroom 1" },
-                { id: "showroom-2", label: "Showroom 2" },
-              ] as const
-            ).map((sr) => {
-              const active = (config.selectedShowroom || "showroom-1") === sr.id;
-              return (
-                <button
-                  key={sr.id}
-                  type="button"
-                  onClick={() =>
-                    setConfig((prev) => ({ ...prev, selectedShowroom: sr.id }))
-                  }
-                  onMouseEnter={() => {
-                    if (sr.id === "showroom-2") {
-                      preloadCarModel("/cars/ShowRoom2.glb");
-                    }
-                  }}
-                  className="px-2.5 py-2 rounded-[3px] text-[10px] font-semibold uppercase tracking-[0.14em] transition-all duration-200"
-                  style={{
-                    background: active
-                      ? isDark
-                        ? "rgba(22, 42, 52, 0.85)"
-                        : "rgba(255, 255, 255, 0.9)"
-                      : isDark
-                        ? "rgba(9, 18, 23, 0.35)"
-                        : "rgba(0, 0, 0, 0.04)",
-                    border: active
-                      ? "1px solid var(--brand-secondary)"
-                      : "1px solid var(--glass-border)",
-                    color: active ? "var(--text-main)" : "var(--text-muted)",
-                    boxShadow: active
-                      ? "inset 0 0 16px rgba(209, 107, 84, 0.1)"
-                      : "none",
-                  }}
-                >
-                  {sr.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
         {/* Zoom level and studio light controls hidden for now */}
         {false && (
           <>
