@@ -469,9 +469,6 @@ export default function ControlPanel({
 
   const handleApplyPreset = (presetKey: "roof" | "hood" | "leftDoor" | "rightDoor") => {
     if (!activeSticker) return;
-        const preset = carPresets[presetKey];
-    if (!preset) return;
-
     const isDoor = presetKey === "leftDoor" || presetKey === "rightDoor";
 
     setConfig((prev) => ({
@@ -480,9 +477,6 @@ export default function ControlPanel({
         s.id === activeSticker.id
           ? {
               ...s,
-              position: [...preset.position],
-              rotation: [...preset.rotation],
-              scale: [activeSticker.scale[0], activeSticker.scale[1], preset.scale[2]],
               preset: presetKey,
               mirrored: isDoor ? s.mirrored : false,
             }
