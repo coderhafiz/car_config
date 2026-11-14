@@ -2382,6 +2382,20 @@ export function Model({
               }
             } else if (cat === "accent") {
               applyMetallicWheelFinish(mat);
+            } else if (cat === "glass") {
+              const nameLower = (mat.name || "").toLowerCase();
+              const isCabinGlass =
+                !nameLower.includes("headlight") &&
+                !nameLower.includes("taillight") &&
+                !nameLower.includes("backlight") &&
+                !nameLower.includes("fog") &&
+                !nameLower.includes("lens") &&
+                !nameLower.includes("mirror") &&
+                !nameLower.includes("red car") &&
+                !nameLower.includes("black window");
+              if (isCabinGlass) {
+                glassSet.add(mat);
+              }
             } else {
               // Deduplicate untextured static materials with identical PBR parameters
               // (e.g. Porsche 911 has 120 Blender materials where many are identical matte/metal/plastic)
@@ -2598,11 +2612,14 @@ export function Model({
     targetAccentColor.current.set(config.accentColor);
   }, [config.accentColor]);
 
-  // Window tint reactive effect
-  useEffect(() => {
-    if (!scene) return;
-    const tint = config.windowTint || (config.tintedWindows ? "smoke" : "smoke");
+  // Pre-filter and cache cabin glass materials once per car model load (never traversed at runtime or per frame)
+  const cabinGlassMaterials = useMemo(() => {
+    if (!scene) return [];
+    const cached = scene.userData?.glassMaterials as (MeshPhysicalMaterial | MeshStandardMaterial)[] | undefined;
+    if (cached && cached.length > 0) return cached;
 
+    // Fallback: one-time scan on initial model load only
+    const glassMats: (MeshPhysicalMaterial | MeshStandardMaterial)[] = [];
     scene.traverse((child) => {
       if (child instanceof Mesh && child.material) {
         const mats = Array.isArray(child.material)
@@ -2610,7 +2627,7 @@ export function Model({
           : [child.material];
         for (let i = 0; i < mats.length; i++) {
           const m = mats[i];
-          if (!m) continue;
+          if (!m || !(m instanceof MeshPhysicalMaterial || m instanceof MeshStandardMaterial)) continue;
           const name = (m.name || "").toLowerCase();
           const childName = (child.name || "").toLowerCase();
           const isCabinGlass =
@@ -2626,32 +2643,45 @@ export function Model({
             !name.includes("mirror") &&
             !name.includes("black window");
 
-          if (isCabinGlass) {
-            m.transparent = true;
-            m.depthWrite = false;
-            if (tint === "limo") {
-              m.color.set("#020304");
-              m.opacity = 0.95;
-              m.roughness = 0.01;
-              m.metalness = 0.7;
-            } else if (tint === "clear") {
-              m.color.set("#252c38");
-              m.opacity = 0.20;
-              m.roughness = 0.05;
-              m.metalness = 0.15;
-            } else {
-              // Smoke (35% tint)
-              m.color.set("#06080b");
-              m.opacity = 0.75;
-              m.roughness = 0.02;
-              m.metalness = 0.45;
-            }
-            m.needsUpdate = true;
+          if (isCabinGlass && !glassMats.includes(m)) {
+            glassMats.push(m);
           }
         }
       }
     });
-  }, [scene, config.windowTint, config.tintedWindows, config.selectedModel]);
+    scene.userData.glassMaterials = glassMats;
+    return glassMats;
+  }, [scene]);
+
+  // Window tint reactive effect: executes ONLY when the user clicks a tint option (0 scene traversals, zero per-frame cost)
+  useEffect(() => {
+    if (cabinGlassMaterials.length === 0) return;
+    const tint = config.windowTint || (config.tintedWindows ? "smoke" : "smoke");
+
+    for (let i = 0; i < cabinGlassMaterials.length; i++) {
+      const m = cabinGlassMaterials[i];
+      m.transparent = true;
+      m.depthWrite = false;
+      if (tint === "limo") {
+        m.color.set("#020304");
+        m.opacity = 0.95;
+        m.roughness = 0.01;
+        m.metalness = 0.7;
+      } else if (tint === "clear") {
+        m.color.set("#252c38");
+        m.opacity = 0.20;
+        m.roughness = 0.05;
+        m.metalness = 0.15;
+      } else {
+        // Smoke (35% tint)
+        m.color.set("#06080b");
+        m.opacity = 0.75;
+        m.roughness = 0.02;
+        m.metalness = 0.45;
+      }
+      m.needsUpdate = true;
+    }
+  }, [cabinGlassMaterials, config.windowTint, config.tintedWindows]);
 
   // Immediately apply matte vs metallic PBR finish whenever mattePaint, mainColor, or scene changes
   useEffect(() => {
