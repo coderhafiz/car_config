@@ -1,7 +1,11 @@
 "use client";
 
 import { useRef, useEffect, useMemo, Fragment } from "react";
-import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
+import {
+  computeBoundsTree,
+  disposeBoundsTree,
+  acceleratedRaycast,
+} from "three-mesh-bvh";
 import { DecalGeometry } from "three-stdlib";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
@@ -40,8 +44,16 @@ import { MeshoptDecoder } from "meshoptimizer";
 
 // Patch three-mesh-bvh acceleration prototypes once on client
 if (typeof window !== "undefined") {
-  (BufferGeometry.prototype as unknown as { computeBoundsTree: typeof computeBoundsTree }).computeBoundsTree = computeBoundsTree;
-  (BufferGeometry.prototype as unknown as { disposeBoundsTree: typeof disposeBoundsTree }).disposeBoundsTree = disposeBoundsTree;
+  (
+    BufferGeometry.prototype as unknown as {
+      computeBoundsTree: typeof computeBoundsTree;
+    }
+  ).computeBoundsTree = computeBoundsTree;
+  (
+    BufferGeometry.prototype as unknown as {
+      disposeBoundsTree: typeof disposeBoundsTree;
+    }
+  ).disposeBoundsTree = disposeBoundsTree;
   Mesh.prototype.raycast = acceleratedRaycast;
 }
 
@@ -55,8 +67,8 @@ export interface DecalConfig {
   textureUrl: string;
   position: [number, number, number];
   rotation: [number, number, number]; // Euler [rx, ry, rz]
-  scale: [number, number, number];    // [width, height, depth]
-  mirrored?: boolean;                 // Symmetric mirror on opposite X side
+  scale: [number, number, number]; // [width, height, depth]
+  mirrored?: boolean; // Symmetric mirror on opposite X side
   preset?: "roof" | "hood" | "leftDoor" | "rightDoor" | "custom";
   targetMeshName?: string;
 }
@@ -86,52 +98,166 @@ export interface ConfigState {
 }
 
 export const DEFAULT_STICKERS = [
-  { id: "racing-07", name: "Racing #07 Roundel", url: "/stickers/racing-07.svg" },
-  { id: "customly-racing", name: "Customly-U Motorsport", url: "/stickers/customly-racing.svg" },
+  {
+    id: "racing-07",
+    name: "Racing #07 Roundel",
+    url: "/stickers/racing-07.svg",
+  },
+  {
+    id: "customly-racing",
+    name: "Customly-U Motorsport",
+    url: "/stickers/customly-racing.svg",
+  },
   { id: "apex-gt", name: "Apex GT Crest", url: "/stickers/apex-gt.svg" },
-  { id: "v8-twin-turbo", name: "V8 Twin Turbo", url: "/stickers/v8-twin-turbo.svg" },
+  {
+    id: "v8-twin-turbo",
+    name: "V8 Twin Turbo",
+    url: "/stickers/v8-twin-turbo.svg",
+  },
 ];
 
-export const DECAL_PRESETS: Record<string, Record<"roof" | "hood" | "leftDoor" | "rightDoor", {
-  position: [number, number, number];
-  rotation: [number, number, number];
-  scale: [number, number, number];
-}>> = {
+export const DECAL_PRESETS: Record<
+  string,
+  Record<
+    "roof" | "hood" | "leftDoor" | "rightDoor",
+    {
+      position: [number, number, number];
+      rotation: [number, number, number];
+      scale: [number, number, number];
+    }
+  >
+> = {
   "audi-r8": {
-    roof: { position: [0, 39, -6], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
-    hood: { position: [0, 26, 42], rotation: [Math.PI / 2.3, 0, 0], scale: [34, 34, 16] },
-    leftDoor: { position: [-38, 24, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
-    rightDoor: { position: [38, 24, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+    roof: {
+      position: [0, 39, -6],
+      rotation: [Math.PI / 2, 0, 0],
+      scale: [36, 36, 16],
+    },
+    hood: {
+      position: [0, 26, 42],
+      rotation: [Math.PI / 2.3, 0, 0],
+      scale: [34, 34, 16],
+    },
+    leftDoor: {
+      position: [-38, 24, -2],
+      rotation: [0, Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
+    rightDoor: {
+      position: [38, 24, -2],
+      rotation: [0, -Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
   },
   "porsche-911": {
-    roof: { position: [0, 42, -5], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
-    hood: { position: [0, 28, 48], rotation: [Math.PI / 2.2, 0, 0], scale: [34, 34, 16] },
-    leftDoor: { position: [-36, 25, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
-    rightDoor: { position: [36, 25, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+    roof: {
+      position: [0, 42, -5],
+      rotation: [Math.PI / 2, 0, 0],
+      scale: [36, 36, 16],
+    },
+    hood: {
+      position: [0, 28, 48],
+      rotation: [Math.PI / 2.2, 0, 0],
+      scale: [34, 34, 16],
+    },
+    leftDoor: {
+      position: [-36, 25, -2],
+      rotation: [0, Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
+    rightDoor: {
+      position: [36, 25, -2],
+      rotation: [0, -Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
   },
   "mercedes-amg": {
-    roof: { position: [0, 40, -8], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
-    hood: { position: [0, 26, 48], rotation: [Math.PI / 2.2, 0, 0], scale: [34, 34, 16] },
-    leftDoor: { position: [-38, 24, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
-    rightDoor: { position: [38, 24, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+    roof: {
+      position: [0, 40, -8],
+      rotation: [Math.PI / 2, 0, 0],
+      scale: [36, 36, 16],
+    },
+    hood: {
+      position: [0, 26, 48],
+      rotation: [Math.PI / 2.2, 0, 0],
+      scale: [34, 34, 16],
+    },
+    leftDoor: {
+      position: [-38, 24, -2],
+      rotation: [0, Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
+    rightDoor: {
+      position: [38, 24, -2],
+      rotation: [0, -Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
   },
   "chevrolet-corvette-c8": {
-    roof: { position: [0, 38, -6], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
-    hood: { position: [0, 25, 46], rotation: [Math.PI / 2.3, 0, 0], scale: [34, 34, 16] },
-    leftDoor: { position: [-38, 23, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
-    rightDoor: { position: [38, 23, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+    roof: {
+      position: [0, 38, -6],
+      rotation: [Math.PI / 2, 0, 0],
+      scale: [36, 36, 16],
+    },
+    hood: {
+      position: [0, 25, 46],
+      rotation: [Math.PI / 2.3, 0, 0],
+      scale: [34, 34, 16],
+    },
+    leftDoor: {
+      position: [-38, 23, -2],
+      rotation: [0, Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
+    rightDoor: {
+      position: [38, 23, -2],
+      rotation: [0, -Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
   },
   "audi-rs6": {
-    roof: { position: [0, 41, 0], rotation: [Math.PI / 2, 0, 0], scale: [38, 38, 16] },
-    hood: { position: [0, 27, 50], rotation: [Math.PI / 2.3, 0, 0], scale: [34, 34, 16] },
-    leftDoor: { position: [-38, 24, 0], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
-    rightDoor: { position: [38, 24, 0], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+    roof: {
+      position: [0, 41, 0],
+      rotation: [Math.PI / 2, 0, 0],
+      scale: [38, 38, 16],
+    },
+    hood: {
+      position: [0, 27, 50],
+      rotation: [Math.PI / 2.3, 0, 0],
+      scale: [34, 34, 16],
+    },
+    leftDoor: {
+      position: [-38, 24, 0],
+      rotation: [0, Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
+    rightDoor: {
+      position: [38, 24, 0],
+      rotation: [0, -Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
   },
   "lamborghini-revuelto": {
-    roof: { position: [0, 38, -6], rotation: [Math.PI / 2, 0, 0], scale: [36, 36, 16] },
-    hood: { position: [0, 24, 46], rotation: [Math.PI / 2.3, 0, 0], scale: [34, 34, 16] },
-    leftDoor: { position: [-38, 24, -2], rotation: [0, Math.PI / 2, 0], scale: [36, 24, 16] },
-    rightDoor: { position: [38, 24, -2], rotation: [0, -Math.PI / 2, 0], scale: [36, 24, 16] },
+    roof: {
+      position: [0, 38, -6],
+      rotation: [Math.PI / 2, 0, 0],
+      scale: [36, 36, 16],
+    },
+    hood: {
+      position: [0, 24, 46],
+      rotation: [Math.PI / 2.3, 0, 0],
+      scale: [34, 34, 16],
+    },
+    leftDoor: {
+      position: [-38, 24, -2],
+      rotation: [0, Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
+    rightDoor: {
+      position: [38, 24, -2],
+      rotation: [0, -Math.PI / 2, 0],
+      scale: [36, 24, 16],
+    },
   },
 };
 
@@ -465,7 +591,10 @@ export const MODELS: ModelInfo[] = [
     accentColor: "#D4D8DD",
     parts: [
       { id: "AM-Lamborghini Revuelto.164", name: "Monofuselage Carbon Body" },
-      { id: "AM-Lamborghini Revuelto.249", name: "Front Forged Y-Spoke Wheels" },
+      {
+        id: "AM-Lamborghini Revuelto.249",
+        name: "Front Forged Y-Spoke Wheels",
+      },
       { id: "AM-Lamborghini Revuelto.253", name: "Rear Forged Y-Spoke Wheels" },
       { id: "AM-Lamborghini Revuelto.248", name: "Dual Hex Sport Exhaust" },
       { id: "AM-Lamborghini Revuelto.239", name: "Performance Tires" },
@@ -496,7 +625,13 @@ let ktx2Loader: KTX2Loader | null = null;
 let persistentCacheInitialized = false;
 
 const ASSET_CACHE_NAME = "customly-u-3d-assets-v8";
-const CACHEABLE_ASSET_PREFIXES = ["/cars/", "/draco/", "/basis/", "/hdri/", "/textures/"];
+const CACHEABLE_ASSET_PREFIXES = [
+  "/cars/",
+  "/draco/",
+  "/basis/",
+  "/hdri/",
+  "/textures/",
+];
 const inFlightAssetFetches = new Map<string, Promise<Response>>();
 
 /**
@@ -511,13 +646,16 @@ function ensurePersistentAssetCache() {
 
   // Explicitly purge older cache stores so outdated models are never served
   if ("caches" in window) {
-    window.caches.keys().then((keys) => {
-      keys.forEach((k) => {
-        if (k.startsWith("customly-u-3d-assets-") && k !== ASSET_CACHE_NAME) {
-          window.caches.delete(k).catch(() => undefined);
-        }
-      });
-    }).catch(() => undefined);
+    window.caches
+      .keys()
+      .then((keys) => {
+        keys.forEach((k) => {
+          if (k.startsWith("customly-u-3d-assets-") && k !== ASSET_CACHE_NAME) {
+            window.caches.delete(k).catch(() => undefined);
+          }
+        });
+      })
+      .catch(() => undefined);
   }
 
   // Request persistent storage quota so the browser never auto-evicts cached .glb models
@@ -536,10 +674,12 @@ function ensurePersistentAssetCache() {
   // reads from and writes to CacheStorage ("customly-u-3d-assets-v1")
   if ("caches" in window && typeof window.fetch === "function") {
     const originalFetch = window.fetch.bind(window);
-    window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    window.fetch = async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
       const method = (
-        init?.method ||
-        (input instanceof Request ? input.method : "GET")
+        init?.method || (input instanceof Request ? input.method : "GET")
       ).toUpperCase();
 
       if (method !== "GET") {
@@ -566,7 +706,7 @@ function ensurePersistentAssetCache() {
       const isCacheableAsset =
         isSameOrigin &&
         CACHEABLE_ASSET_PREFIXES.some((prefix) =>
-          parsedUrl!.pathname.startsWith(prefix)
+          parsedUrl!.pathname.startsWith(prefix),
         );
 
       if (!isCacheableAsset) {
@@ -576,9 +716,14 @@ function ensurePersistentAssetCache() {
       const cacheKey = parsedUrl.href;
       try {
         const cache = await window.caches.open(ASSET_CACHE_NAME);
-        const cachedResponse = await cache.match(cacheKey, { ignoreVary: true });
+        const cachedResponse = await cache.match(cacheKey, {
+          ignoreVary: true,
+        });
         if (cachedResponse) {
-          console.log("[AssetCache] Serving saved 3D asset from cache:", cacheKey);
+          console.log(
+            "[AssetCache] Serving saved 3D asset from cache:",
+            cacheKey,
+          );
           return cachedResponse.clone();
         }
 
@@ -660,16 +805,20 @@ export function PreloadModels() {
       isSafari ||
       isIOS ||
       window.innerWidth < 768 ||
-      /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+      /Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent,
+      ) ||
       navigator.maxTouchPoints > 1;
-    const navConn = (navigator as Navigator & {
-      connection?: { saveData?: boolean; effectiveType?: string };
-    }).connection;
+    const navConn = (
+      navigator as Navigator & {
+        connection?: { saveData?: boolean; effectiveType?: string };
+      }
+    ).connection;
     const isDataConstrained = Boolean(
       navConn?.saveData ||
-        navConn?.effectiveType === "slow-2g" ||
-        navConn?.effectiveType === "2g" ||
-        navConn?.effectiveType === "3g"
+      navConn?.effectiveType === "slow-2g" ||
+      navConn?.effectiveType === "2g" ||
+      navConn?.effectiveType === "3g",
     );
 
     if (isMobileDevice || isDataConstrained) return;
@@ -677,10 +826,10 @@ export function PreloadModels() {
     // 1. High-priority preload: Showroom + CustomlyDrasonLogo + saved/default car model
     //    Gets 100% of browser connections without network contention
     useGLTF.preload("/cars/ShowRoom.glb", "/draco/", true, (loader) =>
-      setupLoaders(loader as GLTFLoader, gl)
+      setupLoaders(loader as GLTFLoader, gl),
     );
     useGLTF.preload("/cars/CustomlyDrasonLogo.glb", "/draco/", true, (loader) =>
-      setupLoaders(loader as GLTFLoader, gl)
+      setupLoaders(loader as GLTFLoader, gl),
     );
 
     // Check if user previously saved a model preference on a prior visit
@@ -696,7 +845,7 @@ export function PreloadModels() {
       // Ignore storage errors
     }
     useGLTF.preload(initialModelUrl, "/draco/", true, (loader) =>
-      setupLoaders(loader as GLTFLoader, gl)
+      setupLoaders(loader as GLTFLoader, gl),
     );
 
     // 2. Prioritized background preloading for remaining cars (heaviest models first: Porsche 911 & Lamborghini)
@@ -708,14 +857,17 @@ export function PreloadModels() {
       "chevrolet-corvette-c8",
     ];
     const otherModels = MODELS.slice(1).sort(
-      (a, b) => priorityOrder.indexOf(a.id) - priorityOrder.indexOf(b.id)
+      (a, b) => priorityOrder.indexOf(a.id) - priorityOrder.indexOf(b.id),
     );
     const timers = otherModels.map((model, idx) =>
-      setTimeout(() => {
-        useGLTF.preload(model.url, "/draco/", true, (loader) =>
-          setupLoaders(loader as GLTFLoader, gl)
-        );
-      }, 500 + idx * 600)
+      setTimeout(
+        () => {
+          useGLTF.preload(model.url, "/draco/", true, (loader) =>
+            setupLoaders(loader as GLTFLoader, gl),
+          );
+        },
+        500 + idx * 600,
+      ),
     );
 
     return () => {
@@ -759,7 +911,9 @@ function restoreSymmetry(root: Object3D, symmetry: SymmetryConfig) {
   const containerWorldInv = containerWorld.clone().invert();
 
   const lateral = AXIS_INDEX[symmetry.axis];
-  const plane = new Vector3().setFromMatrixPosition(containerWorld).getComponent(lateral);
+  const plane = new Vector3()
+    .setFromMatrixPosition(containerWorld)
+    .getComponent(lateral);
   const exclude = new Set((symmetry.exclude ?? []).map(sanitizeNodeName));
   const includeNodesSet = symmetry.includeNodes
     ? new Set(symmetry.includeNodes.map(sanitizeNodeName))
@@ -818,14 +972,19 @@ function restoreSymmetry(root: Object3D, symmetry: SymmetryConfig) {
           if (c.name && symmetry.matchPattern!.test(c.name)) matched = true;
           if (
             (c as { geometry?: { name?: string } }).geometry?.name &&
-            symmetry.matchPattern!.test((c as { geometry?: { name?: string } }).geometry!.name!)
+            symmetry.matchPattern!.test(
+              (c as { geometry?: { name?: string } }).geometry!.name!,
+            )
           ) {
             matched = true;
           }
           if (c instanceof Mesh && c.material) {
-            const rawMats = Array.isArray(c.material) ? c.material : [c.material];
+            const rawMats = Array.isArray(c.material)
+              ? c.material
+              : [c.material];
             rawMats.forEach((m) => {
-              if (m && m.name && symmetry.matchPattern!.test(m.name)) matched = true;
+              if (m && m.name && symmetry.matchPattern!.test(m.name))
+                matched = true;
             });
           }
         });
@@ -852,7 +1011,9 @@ function restoreSymmetry(root: Object3D, symmetry: SymmetryConfig) {
 
   // Front ↔ rear duplication of wheel parts that only exist on one axle
   if (symmetry.axle) {
-    const planeNode = root.getObjectByName(sanitizeNodeName(symmetry.axle.planeNode));
+    const planeNode = root.getObjectByName(
+      sanitizeNodeName(symmetry.axle.planeNode),
+    );
     if (planeNode) {
       const axleAxis = AXIS_INDEX[symmetry.axle.axis];
       const axlePlane = new Vector3()
@@ -898,9 +1059,13 @@ function getPartPath(obj: Object3D, root: Object3D): string {
  * `emissiveMap`), UV transforms, colors, and PBR parameters.
  */
 function cloneAsPhysicalMaterial(
-  m: MeshStandardMaterial
+  m: MeshStandardMaterial,
 ): MeshPhysicalMaterial {
-  if (m instanceof MeshPhysicalMaterial || (m as unknown as { isMeshPhysicalMaterial?: boolean }).isMeshPhysicalMaterial) {
+  if (
+    m instanceof MeshPhysicalMaterial ||
+    (m as unknown as { isMeshPhysicalMaterial?: boolean })
+      .isMeshPhysicalMaterial
+  ) {
     const c = (m as MeshPhysicalMaterial).clone();
     c.vertexColors = false;
     return c;
@@ -923,7 +1088,7 @@ function cloneAsPhysicalMaterial(
  */
 function fixStaticMaterialDefaults(
   mat: MeshStandardMaterial,
-  modelId?: string
+  modelId?: string,
 ): void {
   const m = (mat.name || "").toLowerCase();
 
@@ -1382,11 +1547,7 @@ function fixStaticMaterialDefaults(
     mat.metalness = 0.1;
     return;
   }
-  if (
-    m === "red color" ||
-    m === "red emission" ||
-    m === "back-light-tex"
-  ) {
+  if (m === "red color" || m === "red emission" || m === "back-light-tex") {
     disableTransmissionAndClampSpecular();
     mat.color.set("#aa0808");
     mat.emissive.set("#ff1111");
@@ -1502,11 +1663,7 @@ function classifyMaterial(
   }
 
   // Wheel rims & exterior accents
-  if (
-    m === "metal-black" ||
-    m === "redtrim" ||
-    m === "rubber-white"
-  ) {
+  if (m === "metal-black" || m === "redtrim" || m === "rubber-white") {
     return "accent";
   }
 
@@ -1607,20 +1764,21 @@ function mergeCarMeshesByMaterial(root: Object3D) {
     const mat = child.material;
     const usesTextures = Boolean(
       mat.map ||
-        mat.normalMap ||
-        mat.roughnessMap ||
-        mat.metalnessMap ||
-        mat.aoMap ||
-        mat.emissiveMap ||
-        mat.bumpMap ||
-        mat.alphaMap
+      mat.normalMap ||
+      mat.roughnessMap ||
+      mat.metalnessMap ||
+      mat.aoMap ||
+      mat.emissiveMap ||
+      mat.bumpMap ||
+      mat.alphaMap,
     );
     const usesUv1 = Boolean(mat.aoMap || mat.lightMap);
 
     // If the material uses textures, ensure the mesh actually has a uv attribute
     if (usesTextures && !geom.attributes.uv) return;
     // Skip merging meshes that have secondary UV channels or extra vertex color channels
-    if (geom.attributes.uv1 || geom.attributes.uv2 || geom.attributes.color_1) return;
+    if (geom.attributes.uv1 || geom.attributes.uv2 || geom.attributes.color_1)
+      return;
 
     const posAttr = geom.attributes.position;
     // Keep large high-poly body/wheel meshes zero-copy in their Draco-decoded GPU buffers;
@@ -1806,16 +1964,32 @@ function DecalItem({
         const customRotZ = rotZ;
 
         if (decal.preset === "roof") {
-          pos = new Vector3(center.x, bBox.max.y - 0.01, center.z - carLen * 0.05);
+          pos = new Vector3(
+            center.x,
+            bBox.max.y - 0.01,
+            center.z - carLen * 0.05,
+          );
           rot = new Euler(Math.PI / 2, 0, customRotZ);
         } else if (decal.preset === "hood") {
-          pos = new Vector3(center.x, bBox.min.y + carHeight * 0.62, center.z + carLen * 0.28);
+          pos = new Vector3(
+            center.x,
+            bBox.min.y + carHeight * 0.62,
+            center.z + carLen * 0.28,
+          );
           rot = new Euler(Math.PI / 2.3, 0, customRotZ);
         } else if (decal.preset === "rightDoor") {
-          pos = new Vector3(bBox.max.x - 0.01, bBox.min.y + carHeight * 0.45, center.z);
+          pos = new Vector3(
+            bBox.max.x - 0.01,
+            bBox.min.y + carHeight * 0.45,
+            center.z,
+          );
           rot = new Euler(0, -Math.PI / 2, customRotZ);
         } else if (decal.preset === "leftDoor") {
-          pos = new Vector3(bBox.min.x + 0.01, bBox.min.y + carHeight * 0.45, center.z);
+          pos = new Vector3(
+            bBox.min.x + 0.01,
+            bBox.min.y + carHeight * 0.45,
+            center.z,
+          );
           rot = new Euler(0, Math.PI / 2, customRotZ);
         } else {
           pos = new Vector3(posX, posY, posZ);
@@ -1828,7 +2002,10 @@ function DecalItem({
         decalGeom = new DecalGeometry(bodyMesh, pos, rot, size);
         bodyMesh.matrixWorld.copy(savedMW);
 
-        if (decalGeom.attributes.position && decalGeom.attributes.position.count > 0) {
+        if (
+          decalGeom.attributes.position &&
+          decalGeom.attributes.position.count > 0
+        ) {
           const decalMat = new MeshPhysicalMaterial({
             map: tex,
             transparent: true,
@@ -1883,7 +2060,12 @@ export function CarDecals({
   bodyMeshes: Mesh[];
   mattePaint: boolean;
 }) {
-  if (!stickers || stickers.length === 0 || !bodyMeshes || bodyMeshes.length === 0) {
+  if (
+    !stickers ||
+    stickers.length === 0 ||
+    !bodyMeshes ||
+    bodyMeshes.length === 0
+  ) {
     return null;
   }
 
@@ -1893,13 +2075,18 @@ export function CarDecals({
     <>
       {stickers.map((st) => {
         const targetMesh =
-          (st.targetMeshName ? bodyMeshes.find((m) => m.name === st.targetMeshName) : null) ||
-          primaryMesh;
+          (st.targetMeshName
+            ? bodyMeshes.find((m) => m.name === st.targetMeshName)
+            : null) || primaryMesh;
         if (!targetMesh) return null;
 
         return (
           <Fragment key={st.id}>
-            <DecalItem bodyMesh={targetMesh} decal={st} mattePaint={mattePaint} />
+            <DecalItem
+              bodyMesh={targetMesh}
+              decal={st}
+              mattePaint={mattePaint}
+            />
             {st.mirrored && (
               <DecalItem
                 bodyMesh={targetMesh}
@@ -1910,8 +2097,8 @@ export function CarDecals({
                     st.preset === "leftDoor"
                       ? "rightDoor"
                       : st.preset === "rightDoor"
-                      ? "leftDoor"
-                      : st.preset,
+                        ? "leftDoor"
+                        : st.preset,
                   position: [-st.position[0], st.position[1], st.position[2]],
                   rotation: [st.rotation[0], -st.rotation[1], -st.rotation[2]],
                 }}
@@ -1938,7 +2125,11 @@ export function Model({
   onFirstPaint?: () => void;
   carRotationRef?: React.MutableRefObject<number>;
   isDraggingCarRef?: React.MutableRefObject<boolean>;
-  onPlacementHit?: (position: [number, number, number], rotation: [number, number, number], meshName?: string) => void;
+  onPlacementHit?: (
+    position: [number, number, number],
+    rotation: [number, number, number],
+    meshName?: string,
+  ) => void;
 }) {
   "use no memo";
   const { gl } = useThree();
@@ -1947,7 +2138,7 @@ export function Model({
     MODELS.find((m) => m.id === config.selectedModel) || MODELS[0];
 
   const gltfResult = useGLTF(modelInfo.url, "/draco/", true, (loader) =>
-    setupLoaders(loader as GLTFLoader, gl)
+    setupLoaders(loader as GLTFLoader, gl),
   );
 
   const { scene, targetScale, contactShadowMesh } = useMemo(() => {
@@ -1963,13 +2154,13 @@ export function Model({
     const specialClones = new Map<string, MeshPhysicalMaterial>();
     const dedupedStaticMats = new Map<string, MeshPhysicalMaterial>();
     const extraPaintNames = new Set(
-      (modelInfo.paintMaterials ?? []).map((n) => n.toLowerCase())
+      (modelInfo.paintMaterials ?? []).map((n) => n.toLowerCase()),
     );
 
     const getSpecialClone = (
       key: string,
       baseMat: MeshPhysicalMaterial,
-      setup: (clone: MeshPhysicalMaterial) => void
+      setup: (clone: MeshPhysicalMaterial) => void,
     ): MeshPhysicalMaterial => {
       let c = specialClones.get(key);
       if (!c) {
@@ -2001,8 +2192,10 @@ export function Model({
 
         // Strip Blender vertex color ID masks (COLOR_0 / COLOR_1) so they never tint KTX2 textures or materials
         if (child.geometry) {
-          if (child.geometry.attributes.color) child.geometry.deleteAttribute("color");
-          if (child.geometry.attributes.color_1) child.geometry.deleteAttribute("color_1");
+          if (child.geometry.attributes.color)
+            child.geometry.deleteAttribute("color");
+          if (child.geometry.attributes.color_1)
+            child.geometry.deleteAttribute("color_1");
         }
 
         // Only compute vertex normals if the GLB primitive is missing a NORMAL attribute
@@ -2020,19 +2213,25 @@ export function Model({
             partPath.includes("247") ||
             partPath.includes("45"))
         ) {
-          const grilleMat = getSpecialClone("lamborghini-rear-grille", new MeshPhysicalMaterial(), (clone) => {
-            clone.name = "Lamborghini-Rear-Grille";
-            clone.color.set("#161619");
-            clone.roughness = 0.85;
-            clone.metalness = 0.15;
-            clone.clearcoat = 0.0;
-            clone.side = DoubleSide;
-          });
+          const grilleMat = getSpecialClone(
+            "lamborghini-rear-grille",
+            new MeshPhysicalMaterial(),
+            (clone) => {
+              clone.name = "Lamborghini-Rear-Grille";
+              clone.color.set("#161619");
+              clone.roughness = 0.85;
+              clone.metalness = 0.15;
+              clone.clearcoat = 0.0;
+              clone.side = DoubleSide;
+            },
+          );
           child.material = grilleMat;
           return;
         }
 
-        const rawMats = Array.isArray(child.material) ? child.material : [child.material];
+        const rawMats = Array.isArray(child.material)
+          ? child.material
+          : [child.material];
         const clonedMats = rawMats.map((m) => {
           if (m instanceof MeshStandardMaterial) {
             let mat = clonedByOrig.get(m);
@@ -2073,10 +2272,7 @@ export function Model({
 
             // Special Case C: Audi RS6 `Dashboard` uses "Chrome" on 49k interior
             // vertices; keep dashboard trim dark brushed aluminum instead of bright chrome.
-            if (
-              matNameLower === "chrome" &&
-              partPath.includes("dashboard")
-            ) {
+            if (matNameLower === "chrome" && partPath.includes("dashboard")) {
               return getSpecialClone("dashboard-dark-chrome", mat, (clone) => {
                 clone.color.set("#28282e");
                 clone.metalness = 0.7;
@@ -2136,7 +2332,7 @@ export function Model({
             const cat = classifyMaterial(
               mat.name || "",
               partPath,
-              extraPaintNames
+              extraPaintNames,
             );
 
             if (cat === "paint") {
@@ -2147,9 +2343,13 @@ export function Model({
                 partPath.includes("caliper") ||
                 partPath.includes("bwheels")
               ) {
-                return getSpecialClone(`caliper-${matNameLower}`, mat, (clone) => {
-                  applyMetallicWheelFinish(clone);
-                });
+                return getSpecialClone(
+                  `caliper-${matNameLower}`,
+                  mat,
+                  (clone) => {
+                    applyMetallicWheelFinish(clone);
+                  },
+                );
               }
               // Realistic automotive metallic paint: metallic flake basecoat + glossy clearcoat lacquer
               mat.metalness = 0.68;
@@ -2161,9 +2361,17 @@ export function Model({
               paintSet.add(mat);
               if (!bodyMeshes.includes(child)) {
                 bodyMeshes.push(child);
-                if (child.geometry && !(child.geometry as BufferGeometry & { boundsTree?: unknown }).boundsTree) {
+                if (
+                  child.geometry &&
+                  !(child.geometry as BufferGeometry & { boundsTree?: unknown })
+                    .boundsTree
+                ) {
                   try {
-                    (child.geometry as BufferGeometry & { computeBoundsTree?: () => void }).computeBoundsTree?.();
+                    (
+                      child.geometry as BufferGeometry & {
+                        computeBoundsTree?: () => void;
+                      }
+                    ).computeBoundsTree?.();
                   } catch {
                     // Ignore non-manifold edges
                   }
@@ -2176,13 +2384,13 @@ export function Model({
               // (e.g. Porsche 911 has 120 Blender materials where many are identical matte/metal/plastic)
               const hasAnyTexture = Boolean(
                 mat.map ||
-                  mat.normalMap ||
-                  mat.roughnessMap ||
-                  mat.metalnessMap ||
-                  mat.aoMap ||
-                  mat.emissiveMap ||
-                  mat.bumpMap ||
-                  mat.alphaMap
+                mat.normalMap ||
+                mat.roughnessMap ||
+                mat.metalnessMap ||
+                mat.aoMap ||
+                mat.emissiveMap ||
+                mat.bumpMap ||
+                mat.alphaMap,
               );
               if (!hasAnyTexture) {
                 const matSig = [
@@ -2224,7 +2432,7 @@ export function Model({
         const isGlassMesh = clonedMats.some(
           (cm) =>
             cm instanceof MeshPhysicalMaterial &&
-            (cm.transparent || cm.transmission > 0.05 || cm.opacity < 0.95)
+            (cm.transparent || cm.transmission > 0.05 || cm.opacity < 0.95),
         );
         const isNonShadowDetail =
           partPath.includes("dash") ||
@@ -2244,7 +2452,9 @@ export function Model({
         child.castShadow = !isGlassMesh && !isNonShadowDetail;
         child.receiveShadow = !isGlassMesh;
 
-        child.material = Array.isArray(child.material) ? clonedMats : clonedMats[0];
+        child.material = Array.isArray(child.material)
+          ? clonedMats
+          : clonedMats[0];
       }
     });
 
@@ -2310,7 +2520,7 @@ export function Model({
           depthWrite: false,
           polygonOffset: true,
           polygonOffsetFactor: -1,
-        })
+        }),
       );
       shadowMesh.name = "CarContactShadowPlane";
       shadowMesh.rotation.set(-Math.PI / 2, 0, isXLonger ? Math.PI / 2 : 0);
@@ -2334,9 +2544,16 @@ export function Model({
 
         if (isPaint || isNamedBody) {
           activeBodyMeshes.push(child);
-          if (!(child.geometry as BufferGeometry & { boundsTree?: unknown }).boundsTree) {
+          if (
+            !(child.geometry as BufferGeometry & { boundsTree?: unknown })
+              .boundsTree
+          ) {
             try {
-              (child.geometry as BufferGeometry & { computeBoundsTree?: () => void }).computeBoundsTree?.();
+              (
+                child.geometry as BufferGeometry & {
+                  computeBoundsTree?: () => void;
+                }
+              ).computeBoundsTree?.();
             } catch {
               // ignore non-manifold edges
             }
@@ -2347,7 +2564,8 @@ export function Model({
 
     root.userData.paintMaterials = Array.from(paintSet);
     root.userData.accentMaterials = Array.from(accentSet);
-    root.userData.bodyMeshes = activeBodyMeshes.length > 0 ? activeBodyMeshes : bodyMeshes;
+    root.userData.bodyMeshes =
+      activeBodyMeshes.length > 0 ? activeBodyMeshes : bodyMeshes;
 
     const processed: ProcessedCarScene = {
       scene: root,
@@ -2381,7 +2599,8 @@ export function Model({
     const isMatte = Boolean(config.mattePaint);
     lastAppliedMatteRef.current = isMatte;
     targetPaintColor.current.set(config.mainColor);
-    const paintMats = (scene?.userData?.paintMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
+    const paintMats =
+      (scene?.userData?.paintMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
     for (let i = 0; i < paintMats.length; i++) {
       const mat = paintMats[i];
       if (isMatte) {
@@ -2442,7 +2661,8 @@ export function Model({
     } else {
       if (config.isAnimated && !isDraggingCarRef?.current) {
         wrapperRef.current.rotation.y += delta * 0.15;
-        if (carRotationRef) carRotationRef.current = wrapperRef.current.rotation.y;
+        if (carRotationRef)
+          carRotationRef.current = wrapperRef.current.rotation.y;
       } else {
         const targetRotationY = carRotationRef
           ? carRotationRef.current
@@ -2477,8 +2697,12 @@ export function Model({
     }
 
     const carRoot = wrapperRef.current.children[0];
-    const paintMats = (carRoot?.userData?.paintMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
-    const accentMats = (carRoot?.userData?.accentMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
+    const paintMats =
+      (carRoot?.userData?.paintMaterials as MeshPhysicalMaterial[]) ||
+      EMPTY_MATS;
+    const accentMats =
+      (carRoot?.userData?.accentMaterials as MeshPhysicalMaterial[]) ||
+      EMPTY_MATS;
 
     // Immediate initial color sync on model load / switch
     if (needsImmediateColorSyncRef.current) {
@@ -2529,12 +2753,7 @@ export function Model({
       if (diffSq > 1e-8) {
         const colorSmoothTime = 0.2;
         for (let i = 0; i < paintMats.length; i++) {
-          easing.dampC(
-            paintMats[i].color,
-            tColor,
-            colorSmoothTime,
-            delta,
-          );
+          easing.dampC(paintMats[i].color, tColor, colorSmoothTime, delta);
         }
       } else if (diffSq > 0) {
         for (let i = 0; i < paintMats.length; i++) {
@@ -2552,12 +2771,7 @@ export function Model({
       if (diffSq > 1e-8) {
         const colorSmoothTime = 0.2;
         for (let i = 0; i < accentMats.length; i++) {
-          easing.dampC(
-            accentMats[i].color,
-            tColor,
-            colorSmoothTime,
-            delta,
-          );
+          easing.dampC(accentMats[i].color, tColor, colorSmoothTime, delta);
         }
       } else if (diffSq > 0) {
         for (let i = 0; i < accentMats.length; i++) {
@@ -2578,7 +2792,7 @@ export function Model({
         e.stopPropagation();
 
         const hit = e.intersections.find((i) =>
-          bodyMeshes.some((bm) => bm === i.object)
+          bodyMeshes.some((bm) => bm === i.object),
         );
         if (!hit || !hit.face) return;
 
@@ -2594,13 +2808,15 @@ export function Model({
           onPlacementHit(
             [localPoint.x, localPoint.y, localPoint.z],
             [dummy.rotation.x, dummy.rotation.y, dummy.rotation.z],
-            targetMesh.name
+            targetMesh.name,
           );
         }
       }}
     >
       <primitive object={scene} dispose={null} />
-      {contactShadowMesh && <primitive object={contactShadowMesh} dispose={null} />}
+      {contactShadowMesh && (
+        <primitive object={contactShadowMesh} dispose={null} />
+      )}
       <CarDecals
         stickers={config.stickers || []}
         bodyMeshes={bodyMeshes}
@@ -2618,9 +2834,7 @@ export function Model({
 // exact floor height of the "Cube" mesh.
 const SHOWROOM_SCALE = 55.31;
 const SHOWROOM_OFFSET: [number, number, number] = [
-  -3.458809,
-  -5.9796085,
-  -13.259531,
+  -3.458809, -5.9796085, -13.259531,
 ];
 
 /**
@@ -2719,7 +2933,7 @@ function getShowroomColorForCar(carHex: string): Color {
     result.setRGB(
       baseDark * 0.82 + c.r * 0.18,
       baseDark * 0.82 + c.g * 0.18,
-      baseDark * 0.82 + c.b * 0.18
+      baseDark * 0.82 + c.b * 0.18,
     );
   } else if (lum > 0.75) {
     // Bright / white paint: clean, crisp gallery off-white
@@ -2727,7 +2941,7 @@ function getShowroomColorForCar(carHex: string): Color {
     result.setRGB(
       baseLight * 0.88 + c.r * 0.12,
       baseLight * 0.88 + c.g * 0.12,
-      baseLight * 0.88 + c.b * 0.12
+      baseLight * 0.88 + c.b * 0.12,
     );
   } else {
     // Chromatic / mid-tone paint: luxury architectural studio tint
@@ -2736,7 +2950,7 @@ function getShowroomColorForCar(carHex: string): Color {
     result.setRGB(
       baseGray * 0.62 + c.r * 0.38,
       baseGray * 0.62 + c.g * 0.38,
-      baseGray * 0.62 + c.b * 0.38
+      baseGray * 0.62 + c.b * 0.38,
     );
   }
 
@@ -2752,17 +2966,14 @@ export function Showroom({
 }) {
   const { gl } = useThree();
 
-  const gltfResult = useGLTF(
-    "/cars/ShowRoom.glb",
-    "/draco/",
-    true,
-    (loader) => setupLoaders(loader as GLTFLoader, gl)
+  const gltfResult = useGLTF("/cars/ShowRoom.glb", "/draco/", true, (loader) =>
+    setupLoaders(loader as GLTFLoader, gl),
   );
   const logoResult = useGLTF(
     "/cars/CustomlyDrasonLogo.glb",
     "/draco/",
     true,
-    (loader) => setupLoaders(loader as GLTFLoader, gl)
+    (loader) => setupLoaders(loader as GLTFLoader, gl),
   );
 
   const { scene } = useMemo(() => {
@@ -2863,7 +3074,10 @@ export function Showroom({
       const fixedMats = rawMats.map((m: unknown) => {
         const isStdMat =
           m instanceof MeshStandardMaterial ||
-          Boolean((m as unknown as { isMeshStandardMaterial?: boolean })?.isMeshStandardMaterial);
+          Boolean(
+            (m as unknown as { isMeshStandardMaterial?: boolean })
+              ?.isMeshStandardMaterial,
+          );
         if (!isStdMat) return m as MeshStandardMaterial;
         let mat = clonedByOrig.get(m as MeshStandardMaterial);
         if (!mat) {
@@ -2930,9 +3144,7 @@ export function Showroom({
         return mat;
       });
 
-      mesh.material = Array.isArray(mesh.material)
-        ? fixedMats
-        : fixedMats[0];
+      mesh.material = Array.isArray(mesh.material) ? fixedMats : fixedMats[0];
     });
 
     root.scale.setScalar(1);
@@ -2953,7 +3165,7 @@ export function Showroom({
 
   const targetWallColor = useMemo(
     () => getShowroomColorForCar(mainColor),
-    [mainColor]
+    [mainColor],
   );
 
   useEffect(() => {
@@ -2968,15 +3180,28 @@ export function Showroom({
     const targetEmissive = lightIntensity * 4.5;
     const showroomRoot = showroomGroupRef.current?.children[0];
 
-    const emissiveMats = (showroomRoot?.userData?.emissiveMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
-    if (emissiveMats.length > 0 && Math.abs(emissiveMats[0].emissiveIntensity - targetEmissive) > 0.01) {
+    const emissiveMats =
+      (showroomRoot?.userData?.emissiveMaterials as MeshPhysicalMaterial[]) ||
+      EMPTY_MATS;
+    if (
+      emissiveMats.length > 0 &&
+      Math.abs(emissiveMats[0].emissiveIntensity - targetEmissive) > 0.01
+    ) {
       for (let i = 0; i < emissiveMats.length; i++) {
-        easing.damp(emissiveMats[i], "emissiveIntensity", targetEmissive, 0.2, delta);
+        easing.damp(
+          emissiveMats[i],
+          "emissiveIntensity",
+          targetEmissive,
+          0.2,
+          delta,
+        );
       }
     }
 
     // Steady, pure white illumination for the logo (no pulsing)
-    const logoMats = (showroomRoot?.userData?.logoMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
+    const logoMats =
+      (showroomRoot?.userData?.logoMaterials as MeshPhysicalMaterial[]) ||
+      EMPTY_MATS;
     const targetLogoEmissive = lightIntensity * 3.2;
     for (let i = 0; i < logoMats.length; i++) {
       const mat = logoMats[i];
@@ -2988,19 +3213,39 @@ export function Showroom({
     // Steady white light shining from the wall logo onto the car
     if (logoLightRef.current) {
       logoLightRef.current.color.set("#ffffff");
-      easing.damp(logoLightRef.current, "intensity", lightIntensity * 12.0, 0.2, delta);
+      easing.damp(
+        logoLightRef.current,
+        "intensity",
+        lightIntensity * 12.0,
+        0.2,
+        delta,
+      );
     }
     if (logoSpotRef.current) {
       logoSpotRef.current.color.set("#ffffff");
-      easing.damp(logoSpotRef.current, "intensity", lightIntensity * 14.0, 0.2, delta);
+      easing.damp(
+        logoSpotRef.current,
+        "intensity",
+        lightIntensity * 14.0,
+        0.2,
+        delta,
+      );
     }
     if (logoWashRef.current) {
       logoWashRef.current.color.set("#ffffff");
-      easing.damp(logoWashRef.current, "intensity", lightIntensity * 5.5, 0.2, delta);
+      easing.damp(
+        logoWashRef.current,
+        "intensity",
+        lightIntensity * 5.5,
+        0.2,
+        delta,
+      );
     }
 
     // Dynamically damp the showroom walls to match the vehicle's body color
-    const cubeMat = showroomRoot?.userData?.cubeInteriorMat as MeshPhysicalMaterial | undefined;
+    const cubeMat = showroomRoot?.userData?.cubeInteriorMat as
+      | MeshPhysicalMaterial
+      | undefined;
     if (cubeMat) {
       easing.dampC(cubeMat.color, targetWallColor, 0.25, delta);
     }
@@ -3008,7 +3253,13 @@ export function Showroom({
     // Soft car-colored ambient bounce in the studio
     if (studioBounceRef.current) {
       easing.dampC(studioBounceRef.current.color, targetWallColor, 0.25, delta);
-      easing.damp(studioBounceRef.current, "intensity", lightIntensity * 2.8, 0.2, delta);
+      easing.damp(
+        studioBounceRef.current,
+        "intensity",
+        lightIntensity * 2.8,
+        0.2,
+        delta,
+      );
     }
   });
 

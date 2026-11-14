@@ -389,10 +389,10 @@ export default function SpecificationSheet({
                   <div className="flex items-center gap-2 mt-1">
                     <span
                       className="w-4 h-4 rounded-full border border-white/20 shadow-sm shrink-0"
-                      style={{ backgroundColor: config.wheelColor || config.accentColor }}
+                      style={{ backgroundColor: config.accentColor }}
                     />
                     <span className="font-semibold text-white text-sm">
-                      {config.wheelColor || "Bespoke Alloy"}
+                      {config.accentColor || "Bespoke Alloy"}
                     </span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 uppercase">
                       Forged Lightweight
@@ -408,10 +408,10 @@ export default function SpecificationSheet({
                   <div className="flex items-center gap-2 mt-1">
                     <span
                       className="w-4 h-4 rounded-full border border-white/20 shadow-sm shrink-0"
-                      style={{ backgroundColor: config.caliperColor || config.accentColor }}
+                      style={{ backgroundColor: config.accentColor }}
                     />
                     <span className="font-semibold text-white text-sm">
-                      {config.caliperColor || "Sport Red"}
+                      Sport Finish
                     </span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 uppercase">
                       Monobloc 6-Piston
