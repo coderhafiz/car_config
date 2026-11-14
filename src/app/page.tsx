@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ConfiguratorCanvas from "@/components/configurator/ConfiguratorCanvas";
 import ControlPanel from "@/components/configurator/ControlPanel";
+import SpecificationSheet, { MultiAngleSnapshots } from "@/components/configurator/SpecificationSheet";
 import LandingOverlay from "@/components/ui/LandingOverlay";
 import Loader from "@/components/ui/Loader";
 import { ConfigState, MODELS } from "@/components/configurator/Model";
@@ -23,6 +24,8 @@ export default function Home() {
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
   const [shouldEagerLoad, setShouldEagerLoad] = useState(false);
   const [showHint, setShowHint] = useState(true);
+  const [showSpecSheet, setShowSpecSheet] = useState(false);
+  const captureRef = useRef<(() => Promise<MultiAngleSnapshots>) | null>(null);
 
   // Auto-dismiss interaction hint after 5 seconds to keep the canvas clean
   useEffect(() => {

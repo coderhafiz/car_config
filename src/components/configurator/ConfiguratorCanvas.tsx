@@ -22,6 +22,7 @@ import {
   PreloadTextures,
   MODELS,
 } from "./Model";
+import { MultiAngleSnapshots } from "./SpecificationSheet";
 
 if (typeof window !== "undefined") {
   RectAreaLightUniformsLib.init();
@@ -42,6 +43,7 @@ interface ConfiguratorCanvasProps {
   isInitialLoading?: boolean;
   isCollapsed: boolean;
   setConfig?: React.Dispatch<React.SetStateAction<ConfigState>>;
+  captureRef?: React.MutableRefObject<(() => Promise<MultiAngleSnapshots>) | null>;
 }
 
 function CanvasLoader({ hidden }: { hidden?: boolean }) {
@@ -77,7 +79,9 @@ function SceneContent({
   carRotationRef,
   isDraggingCarRef,
   onPlacementHit,
+  captureRef,
 }: {
+  captureRef?: React.MutableRefObject<(() => Promise<MultiAngleSnapshots>) | null>;
   config: ConfigState;
   onLoaded: () => void;
   isInitialLoading: boolean;
@@ -218,7 +222,62 @@ function SceneContent({
   const ambientLightRef = useRef<THREE.AmbientLight>(null!);
   const interiorFillRef = useRef<THREE.PointLight>(null!);
 
-  const { gl } = useThree();
+  const { gl, scene, camera } = useThree();
+
+  // Expose multi-angle snapshot capture to Specification Sheet
+  useEffect(() => {
+    if (!captureRef) return;
+    captureRef.current = async (): Promise<MultiAngleSnapshots> => {
+      const renderer = gl as THREE.WebGLRenderer;
+      const currentCamera = camera as THREE.PerspectiveCamera;
+
+      const savedPos = currentCamera.position.clone();
+      const savedRot = currentCamera.rotation.clone();
+      const savedFov = currentCamera.fov;
+
+      const snapCamera = new THREE.PerspectiveCamera(38, 16 / 10, 1, 2000);
+
+      const theta = carRotationRef.current || 0;
+      const cosT = Math.cos(theta);
+      const sinT = Math.sin(theta);
+
+      const getPos = (x: number, y: number, z: number): [number, number, number] => {
+        const nx = x * cosT + z * sinT;
+        const nz = -x * sinT + z * cosT;
+        return [nx, y, nz];
+      };
+
+      const views = [
+        { key: "front" as const, pos: getPos(0, 32, 240), target: [0, 24, 0] },
+        { key: "back" as const, pos: getPos(0, 35, -240), target: [0, 24, 0] },
+        { key: "left" as const, pos: getPos(-240, 26, 0), target: [0, 22, 0] },
+        { key: "right" as const, pos: getPos(240, 26, 0), target: [0, 22, 0] },
+      ];
+
+      const snaps: MultiAngleSnapshots = { front: "", back: "", left: "", right: "" };
+
+      for (const v of views) {
+        snapCamera.position.set(v.pos[0], v.pos[1], v.pos[2]);
+        snapCamera.lookAt(v.target[0], v.target[1], v.target[2]);
+        snapCamera.updateMatrixWorld();
+        renderer.render(scene, snapCamera);
+        snaps[v.key] = renderer.domElement.toDataURL("image/jpeg", 0.92);
+      }
+
+      currentCamera.position.copy(savedPos);
+      currentCamera.rotation.copy(savedRot);
+      currentCamera.fov = savedFov;
+      currentCamera.updateMatrixWorld();
+      renderer.render(scene, currentCamera);
+
+      return snaps;
+    };
+
+    return () => {
+      if (captureRef) captureRef.current = null;
+    };
+  }, [gl, scene, camera, captureRef, carRotationRef]);
+
 
 
   useEffect(() => {
@@ -488,6 +547,7 @@ export default function ConfiguratorCanvas({
   isInitialLoading = false,
   isCollapsed,
   setConfig,
+  captureRef,
 }: ConfiguratorCanvasProps) {
   const carRotationRef = useRef(config.rotationY);
 
@@ -603,6 +663,7 @@ export default function ConfiguratorCanvas({
           powerPreference: "high-performance",
           stencil: false,
           depth: true,
+          preserveDrawingBuffer: true,
           toneMapping: THREE.AgXToneMapping,
           toneMappingExposure: 1.25,
         }}
@@ -632,6 +693,7 @@ export default function ConfiguratorCanvas({
             carRotationRef={carRotationRef}
             isDraggingCarRef={isDraggingCarRef}
             onPlacementHit={handlePlacementHit}
+            captureRef={captureRef}
           />
         </Suspense>
       </Canvas>

@@ -75,6 +75,8 @@ export interface ConfigState {
   selectedTexture: string;
   /** True when the selected exterior paint is a matte finish */
   mattePaint: boolean;
+  wheelColor?: string;
+  caliperColor?: string;
   /** Active stickers / decals placed on vehicle body */
   stickers?: DecalConfig[];
   /** Active sticker currently selected for editing */
@@ -1831,9 +1833,13 @@ function DecalItem({
             map: tex,
             transparent: true,
             alphaTest: 0.01,
-            roughness: mattePaint ? 0.9 : 0.18,
-            clearcoat: mattePaint ? 0.0 : 0.8,
-            clearcoatRoughness: 0.04,
+            roughness: 0.06,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.02,
+            metalness: 0.02,
+            specularIntensity: 1.0,
+            specularColor: new Color("#ffffff"),
+            envMapIntensity: 2.2,
             polygonOffset: true,
             polygonOffsetFactor: -4,
             polygonOffsetUnits: -4,

@@ -3,7 +3,7 @@
 import { MODELS, ConfigState, preloadCarModel, DEFAULT_STICKERS, DecalConfig } from "./Model";
 import { Dispatch, SetStateAction, useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Eye, Sofa, Upload, Trash2, Crosshair, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, Sofa, Upload, Trash2, Crosshair, Plus, X, Sparkles } from "lucide-react";
 import { useTheme } from "../ui/ThemeProvider";
 import { useSafari } from "@/hooks/useSafari";
 
@@ -380,6 +380,7 @@ interface ControlPanelProps {
   onModelChange: (id: string) => void;
   isCollapsed: boolean;
   setIsCollapsed: (v: boolean) => void;
+  onOpenSpecSheet?: () => void;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -389,6 +390,7 @@ export default function ControlPanel({
   onModelChange,
   isCollapsed,
   setIsCollapsed,
+  onOpenSpecSheet,
 }: ControlPanelProps) {
   const isSafari = useSafari();
 
@@ -404,6 +406,44 @@ export default function ControlPanel({
 
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+
+  const [customGallery, setCustomGallery] = useState<{ id: string; name: string; url: string }[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem("customly_custom_stickers_gallery");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleRemoveCustomStickerFromGallery = (idToRemove: string) => {
+    setCustomGallery((prev) => {
+      const updated = prev.filter((p) => p.id !== idToRemove);
+      try {
+        localStorage.setItem("customly_custom_stickers_gallery", JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+  };
+
+  const handleRemoveStickerById = (idToRemove: string) => {
+    setConfig((prev) => {
+      const remaining = (prev.stickers || []).filter((s) => s.id !== idToRemove);
+      const nextActiveId =
+        prev.activeStickerId === idToRemove
+          ? remaining[0]?.id
+          : prev.activeStickerId;
+      return {
+        ...prev,
+        stickers: remaining,
+        activeStickerId: nextActiveId,
+      };
+    });
+  };
 
   const activeModel = useMemo(
     () => MODELS.find((m) => m.id === config.selectedModel) || MODELS[0],
@@ -510,44 +550,60 @@ export default function ControlPanel({
   const handleCustomStickerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      if (!dataUrl) return;
-      const existingPresets = new Set((config.stickers || []).map((s) => s.preset));
-      const candidatePresets: Array<"hood" | "roof" | "rightDoor" | "leftDoor"> = [
-        "hood",
-        "roof",
-        "rightDoor",
-        "leftDoor",
-      ];
-      const nextPreset = candidatePresets.find((p) => !existingPresets.has(p)) || "roof";
+      const rawData = ev.target?.result as string;
+      if (!rawData) return;
 
-      const existingIds = new Set((config.stickers || []).map((s) => s.id));
-      let count = (config.stickers || []).length + 1;
-      const baseName = file.name.replace(/[^a-zA-Z0-9]/g, "");
-      let uniqueId = `upload-${baseName}-${count}`;
-      while (existingIds.has(uniqueId)) {
-        count++;
-        uniqueId = `upload-${baseName}-${count}`;
-      }
-      const newSticker: DecalConfig = {
-        id: uniqueId,
-        name: file.name.replace(/\.[^/.]+$/, ""),
-        textureUrl: dataUrl,
-        position: [0, 0, 0],
-        rotation: [0, 0, 0],
-        scale: [34, 34, 16],
-        preset: nextPreset,
-        mirrored: false,
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 512;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressedDataUrl = canvas.toDataURL("image/png");
+
+          const cleanName = file.name.replace(/\.[^/.]+$/, "");
+          const galleryItem = {
+            id: `custom-logo-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            name: cleanName,
+            url: compressedDataUrl,
+          };
+
+          // Save to persistent custom gallery in localStorage
+          setCustomGallery((prev) => {
+            const updated = [galleryItem, ...prev.filter((p) => p.name !== cleanName)];
+            try {
+              localStorage.setItem("customly_custom_stickers_gallery", JSON.stringify(updated));
+            } catch {
+              // ignore quota
+            }
+            return updated;
+          });
+
+          // Add as active sticker on vehicle
+          handleAddNewSticker({ id: galleryItem.id, url: compressedDataUrl, name: cleanName });
+        }
       };
-      setConfig((prev) => ({
-        ...prev,
-        stickers: [...(prev.stickers || []), newSticker],
-        activeStickerId: newSticker.id,
-      }));
+      img.src = rawData;
     };
     reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   const brandGroups = useMemo(() => {
@@ -1050,9 +1106,27 @@ export default function ControlPanel({
                   Bespoke Custom Specification
                 </div>
               </div>
-              <span className="px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] border border-(--glass-border) rounded-xs text-text-main">
-                {activeModel.year} Spec
-              </span>
+              {onOpenSpecSheet ? (
+                <button
+                  type="button"
+                  onClick={onOpenSpecSheet}
+                  className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.16em] rounded-[3px] transition-all hover:brightness-110 flex items-center gap-1.5 cursor-pointer shadow-md"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(209, 107, 84, 0.95) 0%, rgba(175, 75, 55, 0.95) 100%)",
+                    color: "#ffffff",
+                    border: "1px solid rgba(255, 255, 255, 0.25)",
+                  }}
+                  title="View complete specifications and commission this custom build"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Specs & Order</span>
+                </button>
+              ) : (
+                <span className="px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] border border-(--glass-border) rounded-xs text-text-main">
+                  {activeModel.year} Spec
+                </span>
+              )}
             </div>
 
             <ViewModeToggle
