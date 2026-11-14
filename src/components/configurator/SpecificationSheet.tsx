@@ -129,7 +129,6 @@ export default function SpecificationSheet({
   getSnapshots,
 }: SpecificationSheetProps) {
   const [snapshots, setSnapshots] = useState<MultiAngleSnapshots | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
   const [activeView, setActiveView] = useState<"front" | "back" | "left" | "right">("front");
   const [isEnlarged, setIsEnlarged] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -147,26 +146,38 @@ export default function SpecificationSheet({
   const modelInfo = MODELS.find((m) => m.id === config.selectedModel) || MODELS[0];
   const specs = CAR_SPECS[modelInfo.id] || CAR_SPECS["porsche-911"];
 
-  // Capture snapshots whenever the spec sheet opens
-  useEffect(() => {
-    if (!isOpen) {
-      setShowCheckoutModal(false);
-      setOrderSubmitted(false);
-      return;
-    }
+  // Derived loading state avoids synchronous render cascade inside effects
+  const isCapturing = isOpen && Boolean(getSnapshots) && snapshots === null;
 
-    if (getSnapshots) {
-      setIsCapturing(true);
-      getSnapshots()
-        .then((snaps) => {
+  const handleClose = () => {
+    setShowCheckoutModal(false);
+    setOrderSubmitted(false);
+    setIsEnlarged(false);
+    setSnapshots(null);
+    onClose();
+  };
+
+  // Capture snapshots asynchronously whenever the spec sheet is opened
+  useEffect(() => {
+    if (!isOpen || !getSnapshots) return;
+
+    let isMounted = true;
+    getSnapshots()
+      .then((snaps) => {
+        if (isMounted) {
           setSnapshots(snaps);
-          setIsCapturing(false);
-        })
-        .catch((err) => {
-          console.warn("Failed to capture snapshots:", err);
-          setIsCapturing(false);
-        });
-    }
+        }
+      })
+      .catch((err) => {
+        console.warn("Failed to capture snapshots:", err);
+        if (isMounted) {
+          setSnapshots({ front: "", back: "", left: "", right: "" });
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [isOpen, getSnapshots]);
 
   // Handle ESC key
@@ -176,13 +187,13 @@ export default function SpecificationSheet({
         if (showCheckoutModal) {
           setShowCheckoutModal(false);
         } else {
-          onClose();
+          handleClose();
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, showCheckoutModal, onClose]);
+  }, [isOpen, showCheckoutModal]);
 
   if (!isOpen) return null;
 
@@ -246,7 +257,7 @@ export default function SpecificationSheet({
           </button>
 
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-all"
             title="Close Spec Sheet"
           >
@@ -869,10 +880,7 @@ export default function SpecificationSheet({
                       <span>Download Receipt</span>
                     </button>
                     <button
-                      onClick={() => {
-                        setShowCheckoutModal(false);
-                        onClose();
-                      }}
+                      onClick={handleClose}
                       className="px-5 py-2 text-xs rounded-lg bg-[#d16b54] text-white font-bold hover:brightness-110"
                     >
                       Back to Configurator
