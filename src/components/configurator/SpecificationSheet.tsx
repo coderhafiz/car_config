@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -14,7 +14,6 @@ import {
   Download,
   Gauge,
   Zap,
-  Activity,
   Layers,
   Award,
 } from "lucide-react";
@@ -149,13 +148,13 @@ export default function SpecificationSheet({
   // Derived loading state avoids synchronous render cascade inside effects
   const isCapturing = isOpen && Boolean(getSnapshots) && snapshots === null;
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setShowCheckoutModal(false);
     setOrderSubmitted(false);
     setIsEnlarged(false);
     setSnapshots(null);
     onClose();
-  };
+  }, [onClose]);
 
   // Capture snapshots asynchronously whenever the spec sheet is opened
   useEffect(() => {
@@ -193,7 +192,7 @@ export default function SpecificationSheet({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, showCheckoutModal]);
+  }, [isOpen, showCheckoutModal, handleClose]);
 
   if (!isOpen) return null;
 
@@ -330,6 +329,7 @@ export default function SpecificationSheet({
                 >
                   <div className="aspect-[16/10] w-full relative flex items-center justify-center bg-[#070b0e] overflow-hidden">
                     {snapUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={snapUrl}
                         alt={`${modelInfo.name} ${view.label}`}
@@ -483,6 +483,7 @@ export default function SpecificationSheet({
                         className="p-3 rounded-lg bg-black/30 border border-white/5 flex items-center gap-3"
                       >
                         <div className="w-10 h-10 rounded bg-black/40 border border-white/10 p-1 flex items-center justify-center shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={st.textureUrl}
                             alt={st.name}
@@ -653,6 +654,7 @@ export default function SpecificationSheet({
               </div>
 
               <div className="w-full rounded-xl overflow-hidden border border-white/20 bg-black">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={snapshots[activeView]}
                   alt="Enlarged view"
