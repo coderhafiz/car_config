@@ -75,6 +75,7 @@ export default function Home() {
       viewMode: "exterior",
       selectedTexture: "leather",
       mattePaint: false,
+      windowTint: "smoke",
     };
   });
 

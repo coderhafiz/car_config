@@ -2600,32 +2600,57 @@ export function Model({
 
   // Window tint reactive effect
   useEffect(() => {
+    if (!scene) return;
     const tint = config.windowTint || (config.tintedWindows ? "smoke" : "smoke");
-    const glassMats =
-      (scene?.userData?.glassMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
-    for (let i = 0; i < glassMats.length; i++) {
-      const mat = glassMats[i];
-      mat.transparent = true;
-      mat.depthWrite = false;
-      if (tint === "limo") {
-        mat.color.set("#020304");
-        mat.opacity = 0.94;
-        mat.roughness = 0.01;
-        mat.metalness = 0.6;
-      } else if (tint === "clear") {
-        mat.color.set("#15181e");
-        mat.opacity = 0.24;
-        mat.roughness = 0.05;
-        mat.metalness = 0.15;
-      } else {
-        // Smoke default 35% tint
-        mat.color.set("#07090c");
-        mat.opacity = 0.68;
-        mat.roughness = 0.03;
-        mat.metalness = 0.4;
+
+    scene.traverse((child) => {
+      if (child instanceof Mesh && child.material) {
+        const mats = Array.isArray(child.material)
+          ? child.material
+          : [child.material];
+        for (let i = 0; i < mats.length; i++) {
+          const m = mats[i];
+          if (!m) continue;
+          const name = (m.name || "").toLowerCase();
+          const childName = (child.name || "").toLowerCase();
+          const isCabinGlass =
+            (name.includes("glass") ||
+              name.includes("window") ||
+              name.includes("windshield") ||
+              childName.includes("glass") ||
+              childName.includes("window")) &&
+            !name.includes("headlight") &&
+            !name.includes("taillight") &&
+            !name.includes("backlight") &&
+            !name.includes("red car") &&
+            !name.includes("mirror") &&
+            !name.includes("black window");
+
+          if (isCabinGlass) {
+            m.transparent = true;
+            m.depthWrite = false;
+            if (tint === "limo") {
+              m.color.set("#020304");
+              m.opacity = 0.95;
+              m.roughness = 0.01;
+              m.metalness = 0.7;
+            } else if (tint === "clear") {
+              m.color.set("#252c38");
+              m.opacity = 0.20;
+              m.roughness = 0.05;
+              m.metalness = 0.15;
+            } else {
+              // Smoke (35% tint)
+              m.color.set("#06080b");
+              m.opacity = 0.75;
+              m.roughness = 0.02;
+              m.metalness = 0.45;
+            }
+            m.needsUpdate = true;
+          }
+        }
       }
-      mat.needsUpdate = true;
-    }
+    });
   }, [scene, config.windowTint, config.tintedWindows, config.selectedModel]);
 
   // Immediately apply matte vs metallic PBR finish whenever mattePaint, mainColor, or scene changes
