@@ -235,7 +235,7 @@ function SceneContent({
       const savedRot = currentCamera.rotation.clone();
       const savedFov = currentCamera.fov;
 
-      const snapCamera = new THREE.PerspectiveCamera(38, 16 / 10, 1, 2000);
+      const snapCamera = new THREE.PerspectiveCamera(32, 16 / 10, 1, 2000);
 
       const theta = carRotationRef.current || 0;
       const cosT = Math.cos(theta);
@@ -248,11 +248,23 @@ function SceneContent({
       };
 
       const views = [
-        { key: "front" as const, pos: getPos(0, 32, 240), target: [0, 24, 0] },
-        { key: "back" as const, pos: getPos(0, 35, -240), target: [0, 24, 0] },
-        { key: "left" as const, pos: getPos(-240, 26, 0), target: [0, 22, 0] },
-        { key: "right" as const, pos: getPos(240, 26, 0), target: [0, 22, 0] },
+        { key: "front" as const, pos: getPos(0, 34, 305), target: [0, 20, 0] },
+        { key: "back" as const, pos: getPos(0, 34, -305), target: [0, 20, 0] },
+        { key: "left" as const, pos: getPos(-315, 26, 0), target: [0, 20, 0] },
+        { key: "right" as const, pos: getPos(315, 26, 0), target: [0, 20, 0] },
       ];
+
+      // Temporarily hide studio props (plants, vases) during snapshots so the vehicle profile is unobstructed
+      const hiddenProps: THREE.Object3D[] = [];
+      scene.traverse((obj) => {
+        const name = (obj.name || "").toLowerCase();
+        if (name.includes("plant") || name.includes("vase") || name.includes("pot") || name.includes("leaf")) {
+          if (obj.visible) {
+            obj.visible = false;
+            hiddenProps.push(obj);
+          }
+        }
+      });
 
       const snaps: MultiAngleSnapshots = { front: "", back: "", left: "", right: "" };
 
@@ -263,6 +275,9 @@ function SceneContent({
         renderer.render(scene, snapCamera);
         snaps[v.key] = renderer.domElement.toDataURL("image/jpeg", 0.92);
       }
+
+      // Restore studio props
+      hiddenProps.forEach((obj) => (obj.visible = true));
 
       currentCamera.position.copy(savedPos);
       currentCamera.rotation.copy(savedRot);
