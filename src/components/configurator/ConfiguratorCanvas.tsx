@@ -431,7 +431,8 @@ function SceneContent({
         color="#fffaf2"
         castShadow
         shadow-mapSize={isMobile ? [1024, 1024] : [2048, 2048]}
-        shadow-bias={-0.0004}
+        shadow-bias={0.00002}
+        shadow-normalBias={0.05}
       />
 
       {/* Powerful overhead studio flood emitted from inside the ring light */}

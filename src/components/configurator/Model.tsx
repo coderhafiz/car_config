@@ -19,6 +19,7 @@ import {
   Object3D,
   Group,
   WebGLRenderer,
+  FrontSide,
   BackSide,
   DoubleSide,
   CanvasTexture,
@@ -2150,6 +2151,7 @@ export function Model({
               mat.clearcoat = 1.0;
               mat.clearcoatRoughness = 0.04;
               mat.envMapIntensity = 1.25;
+              mat.side = FrontSide;
               paintSet.add(mat);
               if (!bodyMeshes.includes(child)) {
                 bodyMeshes.push(child);
