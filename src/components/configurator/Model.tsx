@@ -383,7 +383,7 @@ export const MODELS: ModelInfo[] = [
     description:
       "Bespoke rear-engine custom program with tailored exterior styling, precision forged rims, and signature race-tex appointments.",
     price: 142700,
-    url: "/cars/Car_config3.glb",
+    url: "/cars/Car_config3_v2.glb",
     type: "glb",
     scale: 1,
     rotationX: 0,
