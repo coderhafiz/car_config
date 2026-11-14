@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useRef, useMemo, useState } from "react";
 import { Canvas, useThree, useFrame, RootState } from "@react-three/fiber";
 import {
+  Environment,
   PerspectiveCamera,
   PerformanceMonitor,
   OrbitControls,
@@ -214,33 +215,11 @@ function SceneContent({
   const superloopSpotRef = useRef<THREE.SpotLight>(null!);
   const superloopCenterRef = useRef<THREE.PointLight>(null!);
   const superloopFrontRef = useRef<THREE.SpotLight>(null!);
-  const planeLightGroupRef = useRef<THREE.Group>(null!);
-  const planeLightRef = useRef<THREE.RectAreaLight>(null!);
-  const planeDirectionalRef = useRef<THREE.DirectionalLight>(null!);
-  const rightSideGroupRef = useRef<THREE.Group>(null!);
-  const rightSideAreaLightRef = useRef<THREE.RectAreaLight>(null!);
-  const rightSideDirectionalRef = useRef<THREE.DirectionalLight>(null!);
   const ambientLightRef = useRef<THREE.AmbientLight>(null!);
   const interiorFillRef = useRef<THREE.PointLight>(null!);
 
   const { gl } = useThree();
 
-  useEffect(() => {
-    if (planeLightGroupRef.current) {
-      planeLightGroupRef.current.lookAt(0, 20, 0);
-    }
-    if (planeDirectionalRef.current) {
-      planeDirectionalRef.current.target.position.set(0, 20, 0);
-      planeDirectionalRef.current.target.updateMatrixWorld();
-    }
-    if (rightSideGroupRef.current) {
-      rightSideGroupRef.current.lookAt(0, 22, 0);
-    }
-    if (rightSideDirectionalRef.current) {
-      rightSideDirectionalRef.current.target.position.set(0, 22, 0);
-      rightSideDirectionalRef.current.target.updateMatrixWorld();
-    }
-  }, []);
 
   useEffect(() => {
     const renderer = gl as THREE.WebGLRenderer;
@@ -257,10 +236,6 @@ function SceneContent({
     if (superloopSpotRef.current) superloopSpotRef.current.intensity = 0;
     if (superloopCenterRef.current) superloopCenterRef.current.intensity = 0;
     if (superloopFrontRef.current) superloopFrontRef.current.intensity = 0;
-    if (planeLightRef.current) planeLightRef.current.intensity = 0;
-    if (planeDirectionalRef.current) planeDirectionalRef.current.intensity = 0;
-    if (rightSideAreaLightRef.current) rightSideAreaLightRef.current.intensity = 0;
-    if (rightSideDirectionalRef.current) rightSideDirectionalRef.current.intensity = 0;
     if (ambientLightRef.current) ambientLightRef.current.intensity = 0;
     if (interiorFillRef.current) interiorFillRef.current.intensity = 0;
     gl.shadowMap.needsUpdate = true;
@@ -287,25 +262,6 @@ function SceneContent({
     const targetFront = config.lightIntensity * 6.5 * studioMultiplier;
     if (superloopFrontRef.current && Math.abs(superloopFrontRef.current.intensity - targetFront) > 0.005) {
       easing.damp(superloopFrontRef.current, "intensity", targetFront, 0.25, delta);
-    }
-    // Studio Plane Light replacing HDRI lighting from the same overhead key direction
-    const targetPlaneLight = config.lightIntensity * 16.0 * studioMultiplier;
-    if (planeLightRef.current && Math.abs(planeLightRef.current.intensity - targetPlaneLight) > 0.05) {
-      easing.damp(planeLightRef.current, "intensity", targetPlaneLight, 0.25, delta);
-    }
-    const targetPlaneDir = config.lightIntensity * 2.2 * studioMultiplier;
-    if (planeDirectionalRef.current && Math.abs(planeDirectionalRef.current.intensity - targetPlaneDir) > 0.01) {
-      easing.damp(planeDirectionalRef.current, "intensity", targetPlaneDir, 0.25, delta);
-    }
-
-    // Passenger side fill area light (completely invisible emitter source illuminating flank & wheels)
-    const targetSideArea = config.lightIntensity * 12.0 * studioMultiplier;
-    const targetSideDir = config.lightIntensity * 1.5 * studioMultiplier;
-    if (rightSideAreaLightRef.current && Math.abs(rightSideAreaLightRef.current.intensity - targetSideArea) > 0.05) {
-      easing.damp(rightSideAreaLightRef.current, "intensity", targetSideArea, 0.25, delta);
-    }
-    if (rightSideDirectionalRef.current && Math.abs(rightSideDirectionalRef.current.intensity - targetSideDir) > 0.01) {
-      easing.damp(rightSideDirectionalRef.current, "intensity", targetSideDir, 0.25, delta);
     }
 
     // Ambient studio bounce so sculpt lines and shadows are distinct and never pitch black
@@ -451,42 +407,11 @@ function SceneContent({
         }
       />
 
-      {/* Studio Plane Light (RectAreaLight): completely invisible light emitter with no visible geometry */}
-      <group ref={planeLightGroupRef} position={[45, 120, 50]}>
-        <rectAreaLight
-          ref={planeLightRef}
-          width={140}
-          height={55}
-          color="#ffffff"
-          intensity={config.lightIntensity * 16.0}
-        />
-      </group>
-
-      {/* Paired directional studio key light from the plane light direction */}
-      <directionalLight
-        ref={planeDirectionalRef}
-        position={[45, 120, 50]}
-        intensity={config.lightIntensity * 2.2}
-        color="#fffbf7"
-        castShadow={false}
-      />
-
-      {/* Passenger Side Fill Area Light (Blender-style studio softbox fill, invisible emitter with zero viewport geometry) */}
-      <group ref={rightSideGroupRef} position={[135, 35, 10]}>
-        <rectAreaLight
-          ref={rightSideAreaLightRef}
-          width={180}
-          height={40}
-          color="#fffcf8"
-          intensity={config.lightIntensity * 12.0}
-        />
-      </group>
-      <directionalLight
-        ref={rightSideDirectionalRef}
-        position={[135, 35, 10]}
-        intensity={config.lightIntensity * 1.5}
-        color="#fffcf8"
-        castShadow={false}
+      {/* Studio HDRI Environment Lighting (story_studio_05_1k.hdr) */}
+      <Environment
+        files="/hdri/story_studio_05_1k.hdr"
+        environmentIntensity={0.65 * config.lightIntensity}
+        background={false}
       />
 
       <ambientLight
