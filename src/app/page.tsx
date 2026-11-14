@@ -288,6 +288,7 @@ export default function Home() {
             </button>
             <button
               id="add-to-cart-btn"
+              onClick={() => setShowSpecSheet(true)}
               className="px-3 lg:px-4 py-2 rounded-[3px] text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.18em] flex items-center gap-2 whitespace-nowrap transition-all duration-200 hover:brightness-110 glass"
               style={{
                 background:
@@ -381,6 +382,7 @@ export default function Home() {
                 onLoaded={() => setIsLoaded(true)}
                 isInitialLoading={!isLoaded}
                 isCollapsed={isCollapsed}
+                captureRef={captureRef}
               />
             )}
           </div>
@@ -393,6 +395,7 @@ export default function Home() {
               onModelChange={handleModelChange}
               isCollapsed={isCollapsed}
               setIsCollapsed={setIsCollapsed}
+              onOpenSpecSheet={() => setShowSpecSheet(true)}
             />
           )}
         </div>
@@ -427,6 +430,17 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
+        {/* Specifications sheet & Commission checkout modal */}
+        <SpecificationSheet
+          isOpen={showSpecSheet}
+          onClose={() => setShowSpecSheet(false)}
+          config={config}
+          getSnapshots={() =>
+            captureRef.current
+              ? captureRef.current()
+              : Promise.resolve({ front: "", back: "", left: "", right: "" })
+          }
+        />
       </motion.div>
     </main>
   );

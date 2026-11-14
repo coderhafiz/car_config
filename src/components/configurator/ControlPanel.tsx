@@ -802,7 +802,7 @@ export default function ControlPanel({
                     <span>+ Add</span>
                   </button>
                 </div>
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                <div className="grid grid-cols-3 gap-2">
                   {(config.stickers || []).map((st, idx) => {
                     const presetLabel =
                       st.preset === "roof"
@@ -814,20 +814,52 @@ export default function ControlPanel({
                         : st.preset === "leftDoor"
                         ? "L-Door"
                         : "Custom";
+                    const isSelected = st.id === activeSticker?.id;
                     return (
-                      <button
+                      <div
                         key={st.id}
                         onClick={() => setConfig((p) => ({ ...p, activeStickerId: st.id }))}
-                        className={`px-2.5 py-1 text-xs rounded-[3px] border flex items-center gap-1.5 whitespace-nowrap transition-all ${
-                          st.id === activeSticker?.id
-                            ? "bg-brand text-white border-brand font-semibold shadow-sm"
+                        className={`group relative p-1.5 rounded-[4px] border flex flex-col items-center justify-between cursor-pointer transition-all ${
+                          isSelected
+                            ? "bg-brand/20 border-brand ring-1 ring-brand text-white shadow-sm"
                             : "glass glass-hover border-border-glass text-text-sub"
                         }`}
                       >
-                        <span>#{idx + 1}</span>
-                        <span className="truncate max-w-[80px]">{st.name?.split(" ")[0] || "Decal"}</span>
-                        <span className="text-[10px] opacity-75">({presetLabel})</span>
-                      </button>
+                        {/* 1-Click Delete Button directly on the card */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveStickerById(st.id);
+                          }}
+                          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-md transition-transform hover:scale-110 z-10"
+                          title="Delete sticker"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+
+                        <div className="w-full flex items-center justify-between gap-1 mb-1">
+                          <span className="text-[10px] font-bold font-mono text-brand">
+                            #{idx + 1}
+                          </span>
+                          <span className="text-[8px] uppercase tracking-wider px-1 py-0.2 rounded bg-white/10 text-text-sub truncate">
+                            {presetLabel}
+                          </span>
+                        </div>
+
+                        <div className="w-full h-8 rounded bg-black/30 border border-white/5 flex items-center justify-center p-0.5 overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={st.textureUrl}
+                            alt={st.name}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </div>
+
+                        <span className="text-[9px] font-medium truncate w-full text-center mt-1">
+                          {st.name?.split(" ")[0] || "Decal"}
+                        </span>
+                      </div>
                     );
                   })}
                 </div>
