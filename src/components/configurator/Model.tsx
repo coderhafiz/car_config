@@ -89,6 +89,8 @@ export interface ConfigState {
   mattePaint: boolean;
   wheelColor?: string;
   caliperColor?: string;
+  windowTint?: "clear" | "smoke" | "limo";
+  tintedWindows?: boolean;
   /** Active stickers / decals placed on vehicle body */
   stickers?: DecalConfig[];
   /** Active sticker currently selected for editing */
@@ -2149,6 +2151,7 @@ export function Model({
 
     const paintSet = new Set<MeshPhysicalMaterial>();
     const accentSet = new Set<MeshPhysicalMaterial>();
+    const glassSet = new Set<MeshPhysicalMaterial>();
     const bodyMeshes: Mesh[] = [];
     const clonedByOrig = new Map<MeshStandardMaterial, MeshPhysicalMaterial>();
     const specialClones = new Map<string, MeshPhysicalMaterial>();
@@ -2564,6 +2567,7 @@ export function Model({
 
     root.userData.paintMaterials = Array.from(paintSet);
     root.userData.accentMaterials = Array.from(accentSet);
+    root.userData.glassMaterials = Array.from(glassSet);
     root.userData.bodyMeshes =
       activeBodyMeshes.length > 0 ? activeBodyMeshes : bodyMeshes;
 
@@ -2593,6 +2597,36 @@ export function Model({
   useEffect(() => {
     targetAccentColor.current.set(config.accentColor);
   }, [config.accentColor]);
+
+  // Window tint reactive effect
+  useEffect(() => {
+    const tint = config.windowTint || (config.tintedWindows ? "smoke" : "smoke");
+    const glassMats =
+      (scene?.userData?.glassMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
+    for (let i = 0; i < glassMats.length; i++) {
+      const mat = glassMats[i];
+      mat.transparent = true;
+      mat.depthWrite = false;
+      if (tint === "limo") {
+        mat.color.set("#020304");
+        mat.opacity = 0.94;
+        mat.roughness = 0.01;
+        mat.metalness = 0.6;
+      } else if (tint === "clear") {
+        mat.color.set("#15181e");
+        mat.opacity = 0.24;
+        mat.roughness = 0.05;
+        mat.metalness = 0.15;
+      } else {
+        // Smoke default 35% tint
+        mat.color.set("#07090c");
+        mat.opacity = 0.68;
+        mat.roughness = 0.03;
+        mat.metalness = 0.4;
+      }
+      mat.needsUpdate = true;
+    }
+  }, [scene, config.windowTint, config.tintedWindows, config.selectedModel]);
 
   // Immediately apply matte vs metallic PBR finish whenever mattePaint, mainColor, or scene changes
   useEffect(() => {

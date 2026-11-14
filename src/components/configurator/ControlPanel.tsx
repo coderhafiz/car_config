@@ -408,6 +408,7 @@ export default function ControlPanel({
   const isDark = theme === "dark";
 
 
+  const [showPlacementPresets, setShowPlacementPresets] = useState(false);
   const [customGallery, setCustomGallery] = useState<{ id: string; name: string; url: string }[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -532,6 +533,15 @@ export default function ControlPanel({
       stickers: (prev.stickers || []).map((s) =>
         s.id === activeSticker.id ? { ...s, ...partial } : s
       ),
+    }));
+  };
+
+  const handleRemoveAllStickers = () => {
+    setConfig((prev) => ({
+      ...prev,
+      stickers: [],
+      activeStickerId: null,
+      stickerPlacementMode: false,
     }));
   };
 
@@ -711,6 +721,57 @@ export default function ControlPanel({
               setConfig((p) => ({ ...p, mainColor: hex, mattePaint: true }))
             }
           />
+
+          {/* Window Tint / Tinted Glass */}
+          <div className="pt-2.5 border-t border-(--glass-border)">
+            <div className="flex items-center justify-between mb-2">
+              <span
+                className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                style={{
+                  color: isDark ? "rgba(210,226,234,0.7)" : "rgba(11,20,24,0.65)",
+                }}
+              >
+                Window Tint
+              </span>
+              <span className="text-[10px] font-mono text-brand font-semibold capitalize">
+                {(config.windowTint || "smoke") === "limo"
+                  ? "Limo Dark (5%)"
+                  : (config.windowTint || "smoke") === "clear"
+                  ? "Factory Clear"
+                  : "Smoke (35%)"}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { id: "clear", label: "Clear Glass", sub: "Factory (70%)" },
+                { id: "smoke", label: "Smoke Tint", sub: "Medium (35%)" },
+                { id: "limo", label: "Limo Black", sub: "Dark (5%)" },
+              ].map((tint) => {
+                const active = (config.windowTint || "smoke") === tint.id;
+                return (
+                  <button
+                    key={tint.id}
+                    type="button"
+                    onClick={() =>
+                      setConfig((p) => ({
+                        ...p,
+                        windowTint: tint.id as "clear" | "smoke" | "limo",
+                        tintedWindows: tint.id !== "clear",
+                      }))
+                    }
+                    className={`py-1.5 px-1.5 rounded-[3px] border flex flex-col items-center justify-center transition-all cursor-pointer ${
+                      active
+                        ? "border-brand bg-brand/20 text-white font-semibold shadow-xs"
+                        : "border-border-glass glass glass-hover text-text-sub"
+                    }`}
+                  >
+                    <span className="text-[10px] font-medium leading-tight">{tint.label}</span>
+                    <span className="text-[8px] opacity-60 font-mono mt-0.5">{tint.sub}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </Folder>
 
@@ -865,53 +926,87 @@ export default function ControlPanel({
                 </div>
               </div>
 
-              {/* Preset Snapping (Top & Sides) */}
-              <div>
-                <span className="text-[11px] font-semibold text-text-sub uppercase tracking-wider block mb-1.5">
-                  Placement Presets
-                </span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    onClick={() => handleApplyPreset("roof")}
-                    className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center ${
-                      activeSticker.preset === "roof"
-                        ? "bg-brand text-white border-brand font-semibold"
-                        : "glass glass-hover border-border-glass text-text-main"
-                    }`}
-                  >
-                    Top (Roof)
-                  </button>
-                  <button
-                    onClick={() => handleApplyPreset("hood")}
-                    className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center ${
-                      activeSticker.preset === "hood"
-                        ? "bg-brand text-white border-brand font-semibold"
-                        : "glass glass-hover border-border-glass text-text-main"
-                    }`}
-                  >
-                    Front Hood
-                  </button>
-                  <button
-                    onClick={() => handleApplyPreset("leftDoor")}
-                    className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center ${
-                      activeSticker.preset === "leftDoor"
-                        ? "bg-brand text-white border-brand font-semibold"
-                        : "glass glass-hover border-border-glass text-text-main"
-                    }`}
-                  >
-                    Driver Door (Left)
-                  </button>
-                  <button
-                    onClick={() => handleApplyPreset("rightDoor")}
-                    className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center ${
-                      activeSticker.preset === "rightDoor"
-                        ? "bg-brand text-white border-brand font-semibold"
-                        : "glass glass-hover border-border-glass text-text-main"
-                    }`}
-                  >
-                    Passenger Door (Right)
-                  </button>
-                </div>
+              {/* Collapsible Placement Presets */}
+              <div className="border border-(--glass-border) rounded-[4px] overflow-hidden bg-black/10">
+                <button
+                  type="button"
+                  onClick={() => setShowPlacementPresets((prev) => !prev)}
+                  className="w-full px-2.5 py-1.5 flex items-center justify-between text-[11px] font-semibold text-text-sub uppercase tracking-wider hover:text-white transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Crosshair className="w-3 h-3 text-brand" />
+                    <span>Placement Presets</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] text-text-muted capitalize">
+                      {activeSticker.preset ? activeSticker.preset : "Choose"}
+                    </span>
+                    {showPlacementPresets ? (
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </div>
+                </button>
+
+                <AnimatePresence>
+                  {showPlacementPresets && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="p-2 pt-0 border-t border-(--glass-border)/50"
+                    >
+                      <div className="grid grid-cols-2 gap-1.5 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => handleApplyPreset("roof")}
+                          className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center cursor-pointer ${
+                            activeSticker.preset === "roof"
+                              ? "bg-brand text-white border-brand font-semibold"
+                              : "glass glass-hover border-border-glass text-text-main"
+                          }`}
+                        >
+                          Top (Roof)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyPreset("hood")}
+                          className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center cursor-pointer ${
+                            activeSticker.preset === "hood"
+                              ? "bg-brand text-white border-brand font-semibold"
+                              : "glass glass-hover border-border-glass text-text-main"
+                          }`}
+                        >
+                          Front Hood
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyPreset("leftDoor")}
+                          className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center cursor-pointer ${
+                            activeSticker.preset === "leftDoor"
+                              ? "bg-brand text-white border-brand font-semibold"
+                              : "glass glass-hover border-border-glass text-text-main"
+                          }`}
+                        >
+                          Driver Door (Left)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyPreset("rightDoor")}
+                          className={`py-1.5 px-2 text-xs rounded-[3px] border transition-all text-center cursor-pointer ${
+                            activeSticker.preset === "rightDoor"
+                              ? "bg-brand text-white border-brand font-semibold"
+                              : "glass glass-hover border-border-glass text-text-main"
+                          }`}
+                        >
+                          Passenger Door (Right)
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* BVH Surface Raycast Placement Button */}
@@ -973,13 +1068,15 @@ export default function ControlPanel({
                 onChange={(v) => updateActiveSticker({ mirrored: v })}
               />
 
-              {/* Remove button */}
+              {/* Remove All Active Stickers */}
               <button
-                onClick={handleDeleteActiveSticker}
-                className="w-full py-1.5 text-xs text-red-500 hover:text-red-400 border border-red-500/20 hover:border-red-500/40 rounded-[3px] flex items-center justify-center gap-1.5 transition-colors"
+                type="button"
+                onClick={handleRemoveAllStickers}
+                className="w-full py-2 text-xs text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500/60 bg-red-500/10 hover:bg-red-500/20 rounded-[3px] flex items-center justify-center gap-1.5 transition-all cursor-pointer font-medium"
+                title="Remove all decals and liveries currently applied to the car"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Remove Active Sticker</span>
+                <span>Remove All Active Stickers</span>
               </button>
             </div>
           )}

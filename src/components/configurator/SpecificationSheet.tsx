@@ -40,7 +40,9 @@ export default function SpecificationSheet({
   getSnapshots,
 }: SpecificationSheetProps) {
   const [snapshots, setSnapshots] = useState<MultiAngleSnapshots | null>(null);
-  const [activeView, setActiveView] = useState<"front" | "back" | "left" | "right">("front");
+  const [activeView, setActiveView] = useState<
+    "front" | "back" | "left" | "right"
+  >("front");
   const [isEnlarged, setIsEnlarged] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [orderSubmitted, setOrderSubmitted] = useState(false);
@@ -51,10 +53,13 @@ export default function SpecificationSheet({
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "wire" | "crypto">("card");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "card" | "wire" | "crypto"
+  >("card");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const modelInfo = MODELS.find((m) => m.id === config.selectedModel) || MODELS[0];
+  const modelInfo =
+    MODELS.find((m) => m.id === config.selectedModel) || MODELS[0];
 
   // Derived loading state avoids synchronous render cascade inside effects
   const isCapturing = isOpen && Boolean(getSnapshots) && snapshots === null;
@@ -114,7 +119,8 @@ export default function SpecificationSheet({
   const stickerCount = (config.stickers || []).length;
   const decalPrice = stickerCount * 750;
   const destinationCharge = 1850;
-  const customizationOnlyPrice = paintPrice + wheelPrice + decalPrice + destinationCharge;
+  const customizationOnlyPrice =
+    paintPrice + wheelPrice + decalPrice + destinationCharge;
   const totalPrice = basePrice + customizationOnlyPrice;
 
   const handlePrint = () => {
@@ -136,7 +142,11 @@ export default function SpecificationSheet({
     { key: "front" as const, label: "Front Fascia & Hood", angle: "Front 0°" },
     { key: "left" as const, label: "Driver Profile", angle: "Left -90°" },
     { key: "right" as const, label: "Passenger Profile", angle: "Right +90°" },
-    { key: "back" as const, label: "Rear Fascia & Spoiler", angle: "Rear 180°" },
+    {
+      key: "back" as const,
+      label: "Rear Fascia & Spoiler",
+      angle: "Rear 180°",
+    },
   ];
 
   return (
@@ -191,7 +201,9 @@ export default function SpecificationSheet({
               {modelInfo.name}
             </h1>
             <p className="text-xs sm:text-sm text-white/60 max-w-2xl mt-1.5 leading-relaxed">
-              Bespoke body styling, custom paintwork, precision forged alloy finish, and high-gloss automotive vinyl liveries tailored specifically to this build.
+              Bespoke body styling, custom paintwork, precision forged alloy
+              finish, and high-gloss automotive vinyl liveries tailored
+              specifically to this build.
             </p>
           </div>
 
@@ -203,7 +215,8 @@ export default function SpecificationSheet({
               ${totalPrice.toLocaleString()}
             </span>
             <span className="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5 font-medium">
-              <CheckCircle2 className="w-3 h-3" /> Certified Customisation Package
+              <CheckCircle2 className="w-3 h-3" /> Certified Customisation
+              Package
             </span>
           </div>
         </div>
@@ -216,7 +229,9 @@ export default function SpecificationSheet({
               <span>Customized 360° Studio Previews</span>
             </h2>
             <span className="text-xs text-white/50">
-              {isCapturing ? "Rendering 4 Studio Angles..." : "Click any angle to view full size"}
+              {isCapturing
+                ? "Rendering 4 Studio Angles..."
+                : "Click any angle to view full size"}
             </span>
           </div>
 
@@ -237,7 +252,7 @@ export default function SpecificationSheet({
                       : "border-white/10 hover:border-white/30 bg-[#091016]/80"
                   }`}
                 >
-                  <div className="aspect-[16/10] w-full relative flex items-center justify-center bg-[#070b0e] overflow-hidden">
+                  <div className="aspect-16/10 w-full relative flex items-center justify-center bg-[#070b0e] overflow-hidden">
                     {snapUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
@@ -248,7 +263,9 @@ export default function SpecificationSheet({
                     ) : (
                       <div className="flex flex-col items-center justify-center gap-2 text-white/40">
                         <div className="w-6 h-6 border-2 border-[#d16b54] border-t-transparent rounded-full animate-spin" />
-                        <span className="text-[11px] font-mono uppercase">Rendering {view.label}...</span>
+                        <span className="text-[11px] font-mono uppercase">
+                          Rendering {view.label}...
+                        </span>
                       </div>
                     )}
 
@@ -297,11 +314,14 @@ export default function SpecificationSheet({
                       {config.mainColor}
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-white/80 uppercase font-medium">
-                      {config.mattePaint ? "Satin Matte Finish" : "High-Gloss Clearcoat"}
+                      {config.mattePaint
+                        ? "Satin Matte Finish"
+                        : "High-Gloss Clearcoat"}
                     </span>
                   </div>
                   <span className="text-[10px] text-white/40 block">
-                    Multi-stage automotive lacquer finish with UV clearcoat shield.
+                    Multi-stage automotive lacquer finish with UV clearcoat
+                    shield.
                   </span>
                 </div>
 
@@ -323,7 +343,8 @@ export default function SpecificationSheet({
                     </span>
                   </div>
                   <span className="text-[10px] text-white/40 block">
-                    Precision machined forged alloy with custom anodized/painted finish.
+                    Precision machined forged alloy with custom anodized/painted
+                    finish.
                   </span>
                 </div>
 
@@ -345,7 +366,8 @@ export default function SpecificationSheet({
                     </span>
                   </div>
                   <span className="text-[10px] text-white/40 block">
-                    High-temperature ceramic brake caliper finish with gloss protective coat.
+                    High-temperature ceramic brake caliper finish with gloss
+                    protective coat.
                   </span>
                 </div>
 
@@ -363,7 +385,26 @@ export default function SpecificationSheet({
                     </span>
                   </div>
                   <span className="text-[10px] text-white/40 block">
-                    Tailored interior appointments and contrasting upholstery stitching.
+                    Tailored interior appointments and contrasting upholstery
+                    stitching.
+                  </span>
+                </div>
+                {/* Window Tint */}
+                <div className="p-3.5 rounded-lg bg-black/30 border border-white/5 space-y-1.5 sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/50 block font-mono uppercase text-[10px]">
+                      Window Tint & Glass Treatment
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-[#d16b54] uppercase font-semibold font-mono">
+                      {(config.windowTint || "smoke") === "limo"
+                        ? "Limo Black (5% Light Transmission)"
+                        : (config.windowTint || "smoke") === "clear"
+                        ? "Factory Clear Glass (70%)"
+                        : "Smoke Tint (35% Light Transmission)"}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-white/40 block">
+                    High-performance UV solar protection film with anti-glare scratch-resistant coating.
                   </span>
                 </div>
               </div>
@@ -374,7 +415,9 @@ export default function SpecificationSheet({
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold tracking-wider uppercase text-white/90 flex items-center gap-2">
                   <Award className="w-4 h-4 text-[#d16b54]" />
-                  <span>Installed Decals & Racing Liveries ({stickerCount})</span>
+                  <span>
+                    Installed Decals & Racing Liveries ({stickerCount})
+                  </span>
                 </h3>
                 <span className="text-xs text-white/50 font-mono">
                   High-Gloss Cast Vinyl
@@ -383,58 +426,61 @@ export default function SpecificationSheet({
 
               {stickerCount === 0 ? (
                 <div className="p-6 rounded-lg bg-black/20 border border-white/5 text-center text-white/50 text-xs">
-                  No vinyl decals currently applied. Add custom liveries from the configurator panel.
+                  No vinyl decals currently applied. Add custom liveries from
+                  the configurator panel.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  {(config.stickers || []).map((st: DecalConfig, idx: number) => {
-                    const presetLabel =
-                      st.preset === "roof"
-                        ? "Top Roof"
-                        : st.preset === "hood"
-                        ? "Front Hood"
-                        : st.preset === "leftDoor"
-                        ? "Driver Door (Left)"
-                        : st.preset === "rightDoor"
-                        ? "Passenger Door (Right)"
-                        : "Custom Body Panel";
-                    return (
-                      <div
-                        key={st.id}
-                        className="p-3 rounded-lg bg-black/30 border border-white/5 flex items-center gap-3"
-                      >
-                        <div className="w-12 h-12 rounded bg-black/40 border border-white/10 p-1 flex items-center justify-center shrink-0">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={st.textureUrl}
-                            alt={st.name}
-                            className="max-w-full max-h-full object-contain"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-mono px-1 rounded bg-[#d16b54]/20 text-[#d16b54] font-bold">
-                              #{idx + 1}
-                            </span>
-                            <span className="text-xs font-semibold text-white truncate">
-                              {st.name || "Decal"}
-                            </span>
+                  {(config.stickers || []).map(
+                    (st: DecalConfig, idx: number) => {
+                      const presetLabel =
+                        st.preset === "roof"
+                          ? "Top Roof"
+                          : st.preset === "hood"
+                            ? "Front Hood"
+                            : st.preset === "leftDoor"
+                              ? "Driver Door (Left)"
+                              : st.preset === "rightDoor"
+                                ? "Passenger Door (Right)"
+                                : "Custom Body Panel";
+                      return (
+                        <div
+                          key={st.id}
+                          className="p-3 rounded-lg bg-black/30 border border-white/5 flex items-center gap-3"
+                        >
+                          <div className="w-12 h-12 rounded bg-black/40 border border-white/10 p-1 flex items-center justify-center shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={st.textureUrl}
+                              alt={st.name}
+                              className="max-w-full max-h-full object-contain"
+                            />
                           </div>
-                          <span className="text-[10px] text-white/60 block mt-0.5">
-                            Placement: {presetLabel}
-                          </span>
-                          <span className="text-[9px] text-white/40 block">
-                            Finish: Ultra-Gloss Cast Vinyl
-                          </span>
-                          {st.mirrored && (
-                            <span className="text-[9px] text-amber-400/90 font-medium block">
-                              • Mirrored to opposite side
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-mono px-1 rounded bg-[#d16b54]/20 text-[#d16b54] font-bold">
+                                #{idx + 1}
+                              </span>
+                              <span className="text-xs font-semibold text-white truncate">
+                                {st.name || "Decal"}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-white/60 block mt-0.5">
+                              Placement: {presetLabel}
                             </span>
-                          )}
+                            <span className="text-[9px] text-white/40 block">
+                              Finish: Ultra-Gloss Cast Vinyl
+                            </span>
+                            {st.mirrored && (
+                              <span className="text-[9px] text-amber-400/90 font-medium block">
+                                • Mirrored to opposite side
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    },
+                  )}
                 </div>
               )}
             </div>
@@ -448,21 +494,30 @@ export default function SpecificationSheet({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div className="p-3 rounded-lg bg-black/25 border border-white/5 space-y-1">
-                  <span className="font-semibold text-white text-xs block">Surface Preparation</span>
+                  <span className="font-semibold text-white text-xs block">
+                    Surface Preparation
+                  </span>
                   <p className="text-[11px] text-white/50 leading-relaxed">
-                    Full paint decontamination, clay bar treatment, and single-stage polish before finish application.
+                    Full paint decontamination, clay bar treatment, and
+                    single-stage polish before finish application.
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-black/25 border border-white/5 space-y-1">
-                  <span className="font-semibold text-white text-xs block">Automotive Cast Vinyl</span>
+                  <span className="font-semibold text-white text-xs block">
+                    Automotive Cast Vinyl
+                  </span>
                   <p className="text-[11px] text-white/50 leading-relaxed">
-                    Premium cast vinyl with micro-air channels, heat-set edge sealing, and UV protective high-gloss overlaminate.
+                    Premium cast vinyl with micro-air channels, heat-set edge
+                    sealing, and UV protective high-gloss overlaminate.
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-black/25 border border-white/5 space-y-1">
-                  <span className="font-semibold text-white text-xs block">Quality Inspection</span>
+                  <span className="font-semibold text-white text-xs block">
+                    Quality Inspection
+                  </span>
                   <p className="text-[11px] text-white/50 leading-relaxed">
-                    Precision alignment under dual 5000K inspection lights and multi-point quality certification.
+                    Precision alignment under dual 5000K inspection lights and
+                    multi-point quality certification.
                   </p>
                 </div>
               </div>
@@ -478,32 +533,55 @@ export default function SpecificationSheet({
 
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between items-center">
-                  <span className="text-white/60">Base Vehicle Platform ({modelInfo.name})</span>
-                  <span className="font-mono font-semibold">${basePrice.toLocaleString()}</span>
+                  <span className="text-white/60">
+                    Base Vehicle Platform ({modelInfo.name})
+                  </span>
+                  <span className="font-mono font-semibold">
+                    ${basePrice.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-white/60">
-                    Bespoke Paint Finish ({config.mattePaint ? "Satin Matte" : "Gloss Clearcoat"})
+                    Bespoke Paint Finish (
+                    {config.mattePaint ? "Satin Matte" : "Gloss Clearcoat"})
                   </span>
-                  <span className="font-mono font-semibold">${paintPrice.toLocaleString()}</span>
+                  <span className="font-mono font-semibold">
+                    ${paintPrice.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-white/60">Custom Forged Alloy Rims</span>
-                  <span className="font-mono font-semibold">${wheelPrice.toLocaleString()}</span>
+                  <span className="text-white/60">
+                    Custom Forged Alloy Rims
+                  </span>
+                  <span className="font-mono font-semibold">
+                    ${wheelPrice.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-white/60">Bespoke Vinyl Decals ({stickerCount})</span>
-                  <span className="font-mono font-semibold">${decalPrice.toLocaleString()}</span>
+                  <span className="text-white/60">
+                    Bespoke Vinyl Decals ({stickerCount})
+                  </span>
+                  <span className="font-mono font-semibold">
+                    ${decalPrice.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-white/60">Surface Prep, Clearcoat Protection & Prep</span>
-                  <span className="font-mono font-semibold">${destinationCharge.toLocaleString()}</span>
+                  <span className="text-white/60">
+                    Surface Prep, Clearcoat Protection & Prep
+                  </span>
+                  <span className="font-mono font-semibold">
+                    ${destinationCharge.toLocaleString()}
+                  </span>
                 </div>
 
                 <div className="pt-3 border-t border-white/10 flex justify-between items-baseline">
                   <div>
-                    <span className="text-sm font-bold text-white block">Total Investment</span>
-                    <span className="text-[10px] text-white/50">Includes full vehicle build and bespoke customisation</span>
+                    <span className="text-sm font-bold text-white block">
+                      Total Investment
+                    </span>
+                    <span className="text-[10px] text-white/50">
+                      Includes full vehicle build and bespoke customisation
+                    </span>
                   </div>
                   <span className="text-2xl font-extrabold text-[#d16b54] font-mono">
                     ${totalPrice.toLocaleString()}
@@ -517,7 +595,8 @@ export default function SpecificationSheet({
                   onClick={() => setShowCheckoutModal(true)}
                   className="w-full py-3.5 px-4 rounded-lg font-bold text-sm text-white flex items-center justify-center gap-2 shadow-lg transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer"
                   style={{
-                    background: "linear-gradient(135deg, #e07a5f 0%, #c4553b 100%)",
+                    background:
+                      "linear-gradient(135deg, #e07a5f 0%, #c4553b 100%)",
                     boxShadow: "0 6px 20px rgba(209, 107, 84, 0.4)",
                   }}
                 >
@@ -528,7 +607,9 @@ export default function SpecificationSheet({
 
                 <div className="flex items-center justify-center gap-1.5 text-[11px] text-white/50">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Secure Bespoke Build Reservation • Concierge Support</span>
+                  <span>
+                    Secure Bespoke Build Reservation • Concierge Support
+                  </span>
                 </div>
               </div>
             </div>
@@ -559,7 +640,8 @@ export default function SpecificationSheet({
                     Bespoke 3D Studio Render
                   </span>
                   <h3 className="text-lg font-bold">
-                    {modelInfo.name} — {viewCards.find((v) => v.key === activeView)?.label}
+                    {modelInfo.name} —{" "}
+                    {viewCards.find((v) => v.key === activeView)?.label}
                   </h3>
                 </div>
                 <button
@@ -629,18 +711,25 @@ export default function SpecificationSheet({
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>Custom Commission Order</span>
                     </div>
-                    <h3 className="text-xl font-bold">Reserve Your Bespoke Build</h3>
+                    <h3 className="text-xl font-bold">
+                      Reserve Your Bespoke Build
+                    </h3>
                     <p className="text-xs text-white/60">
-                      Submit your reservation to commission this {modelInfo.name} with your custom finish and liveries.
+                      Submit your reservation to commission this{" "}
+                      {modelInfo.name} with your custom finish and liveries.
                     </p>
                   </div>
 
                   {/* Summary Snapshot Bar */}
                   <div className="p-3.5 rounded-lg bg-black/40 border border-white/10 flex items-center justify-between text-xs">
                     <div>
-                      <span className="font-semibold block">{modelInfo.name}</span>
+                      <span className="font-semibold block">
+                        {modelInfo.name}
+                      </span>
                       <span className="text-[11px] text-white/50">
-                        {config.mattePaint ? "Satin Matte" : "Gloss"} • {stickerCount} Livery Decal{stickerCount !== 1 ? "s" : ""}
+                        {config.mattePaint ? "Satin Matte" : "Gloss"} •{" "}
+                        {stickerCount} Livery Decal
+                        {stickerCount !== 1 ? "s" : ""}
                       </span>
                     </div>
                     <span className="font-mono font-bold text-base text-[#d16b54]">
@@ -648,9 +737,14 @@ export default function SpecificationSheet({
                     </span>
                   </div>
 
-                  <form onSubmit={handleCheckoutSubmit} className="space-y-4 text-xs">
+                  <form
+                    onSubmit={handleCheckoutSubmit}
+                    className="space-y-4 text-xs"
+                  >
                     <div className="space-y-1.5">
-                      <label className="font-semibold text-white/80">Full Name</label>
+                      <label className="font-semibold text-white/80">
+                        Full Name
+                      </label>
                       <input
                         type="text"
                         required
@@ -663,7 +757,9 @@ export default function SpecificationSheet({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <label className="font-semibold text-white/80">Email Address</label>
+                        <label className="font-semibold text-white/80">
+                          Email Address
+                        </label>
                         <input
                           type="email"
                           required
@@ -674,7 +770,9 @@ export default function SpecificationSheet({
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="font-semibold text-white/80">Phone Number</label>
+                        <label className="font-semibold text-white/80">
+                          Phone Number
+                        </label>
                         <input
                           type="tel"
                           required
@@ -687,7 +785,9 @@ export default function SpecificationSheet({
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="font-semibold text-white/80">Delivery City & Country</label>
+                      <label className="font-semibold text-white/80">
+                        Delivery City & Country
+                      </label>
                       <input
                         type="text"
                         required
@@ -700,12 +800,26 @@ export default function SpecificationSheet({
 
                     {/* Payment Method Selector */}
                     <div className="space-y-2 pt-1">
-                      <label className="font-semibold text-white/80 block">Commission Deposit Method</label>
+                      <label className="font-semibold text-white/80 block">
+                        Commission Deposit Method
+                      </label>
                       <div className="grid grid-cols-3 gap-2">
                         {[
-                          { id: "card" as const, label: "Credit Card", icon: CreditCard },
-                          { id: "wire" as const, label: "Bank Wire", icon: Building },
-                          { id: "crypto" as const, label: "Crypto / USDC", icon: ShieldCheck },
+                          {
+                            id: "card" as const,
+                            label: "Credit Card",
+                            icon: CreditCard,
+                          },
+                          {
+                            id: "wire" as const,
+                            label: "Bank Wire",
+                            icon: Building,
+                          },
+                          {
+                            id: "crypto" as const,
+                            label: "Crypto / USDC",
+                            icon: ShieldCheck,
+                          },
                         ].map((m) => {
                           const Icon = m.icon;
                           const active = paymentMethod === m.id;
@@ -733,7 +847,8 @@ export default function SpecificationSheet({
                       disabled={isSubmitting}
                       className="w-full py-3 rounded-lg font-bold text-xs text-white uppercase tracking-wider flex items-center justify-center gap-2 mt-4 transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer"
                       style={{
-                        background: "linear-gradient(135deg, #e07a5f 0%, #c4553b 100%)",
+                        background:
+                          "linear-gradient(135deg, #e07a5f 0%, #c4553b 100%)",
                         boxShadow: "0 4px 15px rgba(209, 107, 84, 0.4)",
                       }}
                     >
@@ -760,14 +875,20 @@ export default function SpecificationSheet({
                   <div>
                     <h3 className="text-xl font-bold">Commission Reserved!</h3>
                     <p className="text-xs text-white/60 mt-1 max-w-sm mx-auto">
-                      Thank you, <strong className="text-white">{customerName || "Collector"}</strong>. Your bespoke build commission has been registered.
+                      Thank you,{" "}
+                      <strong className="text-white">
+                        {customerName || "Collector"}
+                      </strong>
+                      . Your bespoke build commission has been registered.
                     </p>
                   </div>
 
                   <div className="p-3.5 rounded-lg bg-black/50 border border-white/10 text-xs text-left space-y-1.5 max-w-sm mx-auto">
                     <div className="flex justify-between">
                       <span className="text-white/50">Reference:</span>
-                      <span className="font-mono font-bold text-[#d16b54]">{orderId}</span>
+                      <span className="font-mono font-bold text-[#d16b54]">
+                        {orderId}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/50">Vehicle:</span>
@@ -775,7 +896,9 @@ export default function SpecificationSheet({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/50">Production Slot:</span>
-                      <span className="text-emerald-400 font-semibold">6–8 Weeks Handcrafted</span>
+                      <span className="text-emerald-400 font-semibold">
+                        6–8 Weeks Handcrafted
+                      </span>
                     </div>
                   </div>
 
