@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -95,6 +96,21 @@ export default function SpecificationSheet({
     };
   }, [isOpen, getSnapshots]);
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Lock background scroll when checkout modal or enlarged lightbox is open
+  useEffect(() => {
+    if (!showCheckoutModal && !isEnlarged) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showCheckoutModal, isEnlarged]);
+
   // Handle ESC key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -150,7 +166,11 @@ export default function SpecificationSheet({
   ];
 
   return (
-    <div className="fixed inset-0 z-500 overflow-y-auto bg-black/95 backdrop-blur-2xl text-white flex flex-col font-sans">
+    <div
+      className={`fixed inset-0 z-500 bg-black/95 backdrop-blur-2xl text-white flex flex-col font-sans ${
+        showCheckoutModal || isEnlarged ? "overflow-hidden" : "overflow-y-auto"
+      }`}
+    >
       {/* Header Bar */}
       <header className="sticky top-0 z-40 px-6 py-4 border-b border-white/10 bg-[#070d11]/90 backdrop-blur-md flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -636,79 +656,83 @@ export default function SpecificationSheet({
       </main>
 
       {/* Enlarged Image Lightbox */}
-      <AnimatePresence>
-        {isEnlarged && snapshots && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-600 bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-8"
-            onClick={() => setIsEnlarged(false)}
-          >
+      {mounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {isEnlarged && snapshots && (
             <motion.div
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.95 }}
-              className="relative max-w-6xl w-full flex flex-col items-center gap-4"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-8"
+              onClick={() => setIsEnlarged(false)}
             >
-              <div className="w-full flex items-center justify-between text-white">
-                <div>
-                  <span className="text-xs uppercase font-mono text-[#d16b54] tracking-widest block">
-                    Bespoke 3D Studio Render
-                  </span>
-                  <h3 className="text-lg font-bold">
-                    {modelInfo.name} —{" "}
-                    {viewCards.find((v) => v.key === activeView)?.label}
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setIsEnlarged(false)}
-                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="w-full rounded-xl overflow-hidden border border-white/20 bg-black">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={snapshots[activeView]}
-                  alt="Enlarged view"
-                  className="w-full max-h-[75vh] object-contain mx-auto"
-                />
-              </div>
-
-              {/* View Switcher in Lightbox */}
-              <div className="flex items-center gap-2 mt-2">
-                {viewCards.map((v) => (
+              <motion.div
+                initial={{ scale: 0.95 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.95 }}
+                className="relative max-w-6xl w-full flex flex-col items-center gap-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-full flex items-center justify-between text-white">
+                  <div>
+                    <span className="text-xs uppercase font-mono text-[#d16b54] tracking-widest block">
+                      Bespoke 3D Studio Render
+                    </span>
+                    <h3 className="text-lg font-bold">
+                      {modelInfo.name} —{" "}
+                      {viewCards.find((v) => v.key === activeView)?.label}
+                    </h3>
+                  </div>
                   <button
-                    key={v.key}
-                    onClick={() => setActiveView(v.key)}
-                    className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer ${
-                      activeView === v.key
-                        ? "bg-[#d16b54] text-white"
-                        : "bg-white/10 hover:bg-white/20 text-white/70"
-                    }`}
+                    onClick={() => setIsEnlarged(false)}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer"
                   >
-                    {v.label}
+                    <X className="w-4 h-4" />
                   </button>
-                ))}
-              </div>
+                </div>
+
+                <div className="w-full rounded-xl overflow-hidden border border-white/20 bg-black">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={snapshots[activeView]}
+                    alt="Enlarged view"
+                    className="w-full max-h-[75vh] object-contain mx-auto"
+                  />
+                </div>
+
+                {/* View Switcher in Lightbox */}
+                <div className="flex items-center gap-2 mt-2">
+                  {viewCards.map((v) => (
+                    <button
+                      key={v.key}
+                      onClick={() => setActiveView(v.key)}
+                      className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer ${
+                        activeView === v.key
+                          ? "bg-[#d16b54] text-white"
+                          : "bg-white/10 hover:bg-white/20 text-white/70"
+                      }`}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Checkout / Commission Modal */}
-      <AnimatePresence>
-        {showCheckoutModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-600 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
-          >
+      {mounted && typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {showCheckoutModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
+            >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -940,7 +964,9 @@ export default function SpecificationSheet({
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+    )}
     </div>
   );
 }
