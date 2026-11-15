@@ -734,11 +734,11 @@ export default function ControlPanel({
                 Window Tint
               </span>
               <span className="text-[10px] font-mono text-brand font-semibold capitalize">
-                {(config.windowTint || "smoke") === "limo"
+                {(config.windowTint || "clear") === "limo"
                   ? "Limo Dark (5%)"
-                  : (config.windowTint || "smoke") === "clear"
-                  ? "Factory Clear"
-                  : "Smoke (35%)"}
+                  : (config.windowTint || "clear") === "smoke"
+                  ? "Smoke (35%)"
+                  : "Factory Clear"}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
@@ -747,7 +747,7 @@ export default function ControlPanel({
                 { id: "smoke", label: "Smoke Tint", sub: "Medium (35%)" },
                 { id: "limo", label: "Limo Black", sub: "Dark (5%)" },
               ].map((tint) => {
-                const active = (config.windowTint || "smoke") === tint.id;
+                const active = (config.windowTint || "clear") === tint.id;
                 return (
                   <button
                     key={tint.id}
@@ -767,6 +767,56 @@ export default function ControlPanel({
                   >
                     <span className="text-[10px] font-medium leading-tight">{tint.label}</span>
                     <span className="text-[8px] opacity-60 font-mono mt-0.5">{tint.sub}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Headlight Tint / Lens Treatment */}
+          <div className="pt-2.5 border-t border-(--glass-border)">
+            <div className="flex items-center justify-between mb-2">
+              <span
+                className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+                style={{
+                  color: isDark ? "rgba(210,226,234,0.7)" : "rgba(11,20,24,0.65)",
+                }}
+              >
+                Headlight Tint
+              </span>
+              <span className="text-[10px] font-mono text-brand font-semibold capitalize">
+                {(config.headlightTint || "clear") === "smoke"
+                  ? "Smoked Lens"
+                  : (config.headlightTint || "clear") === "yellow"
+                  ? "GT3 Yellow"
+                  : "Factory Clear"}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { id: "clear", label: "Clear Lens", sub: "Factory Optical" },
+                { id: "smoke", label: "Smoked", sub: "Competition" },
+                { id: "yellow", label: "GT3 Yellow", sub: "Endurance" },
+              ].map((hl) => {
+                const active = (config.headlightTint || "clear") === hl.id;
+                return (
+                  <button
+                    key={hl.id}
+                    type="button"
+                    onClick={() =>
+                      setConfig((p) => ({
+                        ...p,
+                        headlightTint: hl.id as "clear" | "smoke" | "yellow",
+                      }))
+                    }
+                    className={`py-1.5 px-1.5 rounded-[3px] border flex flex-col items-center justify-center transition-all cursor-pointer ${
+                      active
+                        ? "border-brand bg-brand/20 text-white font-semibold shadow-xs"
+                        : "border-border-glass glass glass-hover text-text-sub"
+                    }`}
+                  >
+                    <span className="text-[10px] font-medium leading-tight">{hl.label}</span>
+                    <span className="text-[8px] opacity-60 font-mono mt-0.5">{hl.sub}</span>
                   </button>
                 );
               })}

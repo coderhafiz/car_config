@@ -390,21 +390,39 @@ export default function SpecificationSheet({
                   </span>
                 </div>
                 {/* Window Tint */}
-                <div className="p-3.5 rounded-lg bg-black/30 border border-white/5 space-y-1.5 sm:col-span-2">
+                <div className="p-3.5 rounded-lg bg-black/30 border border-white/5 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-white/50 block font-mono uppercase text-[10px]">
-                      Window Tint & Glass Treatment
+                      Window Tint & Glass
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-[#d16b54] uppercase font-semibold font-mono">
-                      {(config.windowTint || "smoke") === "limo"
-                        ? "Limo Black (5% Light Transmission)"
-                        : (config.windowTint || "smoke") === "clear"
-                        ? "Factory Clear Glass (70%)"
-                        : "Smoke Tint (35% Light Transmission)"}
+                      {(config.windowTint || "clear") === "limo"
+                        ? "Limo Black (5%)"
+                        : (config.windowTint || "clear") === "smoke"
+                        ? "Smoke Tint (35%)"
+                        : "Factory Clear (70%)"}
                     </span>
                   </div>
                   <span className="text-[10px] text-white/40 block">
-                    High-performance UV solar protection film with anti-glare scratch-resistant coating.
+                    High-performance UV solar protection cabin glazing with anti-glare finish.
+                  </span>
+                </div>
+                {/* Headlight Lens Treatment */}
+                <div className="p-3.5 rounded-lg bg-black/30 border border-white/5 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/50 block font-mono uppercase text-[10px]">
+                      Headlight Lens Treatment
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-[#d16b54] uppercase font-semibold font-mono">
+                      {(config.headlightTint || "clear") === "smoke"
+                        ? "Competition Smoked"
+                        : (config.headlightTint || "clear") === "yellow"
+                        ? "GT3 Endurance Yellow"
+                        : "Factory Optical Clear"}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-white/40 block">
+                    Aerospace-grade polycarbonate lens coating with precision optical transparency.
                   </span>
                 </div>
               </div>

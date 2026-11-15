@@ -75,7 +75,9 @@ export default function Home() {
       viewMode: "exterior",
       selectedTexture: "leather",
       mattePaint: false,
-      windowTint: "smoke",
+      windowTint: 'clear',
+      headlightTint: 'clear',
+      tintedWindows: false,
     };
   });
 

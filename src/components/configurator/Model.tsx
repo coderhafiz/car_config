@@ -90,6 +90,7 @@ export interface ConfigState {
   wheelColor?: string;
   caliperColor?: string;
   windowTint?: "clear" | "smoke" | "limo";
+  headlightTint?: "clear" | "smoke" | "yellow";
   tintedWindows?: boolean;
   /** Active stickers / decals placed on vehicle body */
   stickers?: DecalConfig[];
@@ -1916,11 +1917,13 @@ function DecalItem({
   decal,
   mattePaint,
   targetScale = 55.32,
+  isXLonger = false,
 }: {
   bodyMesh: Mesh;
   decal: DecalConfig;
   mattePaint: boolean;
   targetScale?: number;
+  isXLonger?: boolean;
 }) {
   const scaleX = decal.scale?.[0] || 34;
   const rotX = decal.rotation?.[0] || 0;
@@ -1953,7 +1956,6 @@ function DecalItem({
 
         const spanX = Math.max(0.1, bBox.max.x - bBox.min.x);
         const spanZ = Math.max(0.1, bBox.max.z - bBox.min.z);
-        const isXLonger = spanX > spanZ;
         const carLen = Math.max(spanX, spanZ);
         const carHeight = Math.max(0.5, bBox.max.y - bBox.min.y);
         const center = bBox.getCenter(new Vector3());
@@ -1968,7 +1970,8 @@ function DecalItem({
         const scaleMult = scaleX / 34;
         const decalWidth = baseSize * scaleMult;
         const decalHeight = baseSize * scaleMult;
-        const decalDepth = baseSize * 0.9;
+        // Deep projection box (3x baseSize) so curved door and hood panels are fully enveloped without clipping
+        const decalDepth = baseSize * 3.0;
         const size = new Vector3(decalWidth, decalHeight, decalDepth);
 
         let pos: Vector3;
@@ -1978,40 +1981,44 @@ function DecalItem({
 
         if (isXLonger) {
           // Cars modeled along X in local geometry (Audi RS6 Avant, Audi RS8 Sport)
+          // Front is -X, Rear is +X. Left door is +Z, Right door is -Z.
           if (decal.preset === "roof") {
             pos = new Vector3(
               center.x + carLen * 0.05,
               bBox.max.y - 0.01,
               center.z,
             );
-            rot = new Euler(Math.PI / 2, 0, customRotZ - Math.PI / 2);
+            rot = new Euler(Math.PI / 2, 0, customRotZ);
           } else if (decal.preset === "hood") {
             pos = new Vector3(
               center.x - carLen * 0.28,
               bBox.min.y + carHeight * 0.62,
               center.z,
             );
-            rot = new Euler(Math.PI / 2.3, 0, customRotZ - Math.PI / 2);
+            rot = new Euler(Math.PI / 2.3, 0, customRotZ);
           } else if (decal.preset === "rightDoor") {
+            // Right door is at -Z (passenger side in LHD). Projector placed outside at -Z, pointing toward +Z
             pos = new Vector3(
               center.x,
               bBox.min.y + carHeight * 0.45,
-              bBox.min.z + 0.01,
-            );
-            rot = new Euler(0, Math.PI, customRotZ);
-          } else if (decal.preset === "leftDoor") {
-            pos = new Vector3(
-              center.x,
-              bBox.min.y + carHeight * 0.45,
-              bBox.max.z - 0.01,
+              bBox.min.z - 0.08,
             );
             rot = new Euler(0, 0, customRotZ);
+          } else if (decal.preset === "leftDoor") {
+            // Left door is at +Z (driver side in LHD). Projector placed outside at +Z, pointing toward -Z
+            pos = new Vector3(
+              center.x,
+              bBox.min.y + carHeight * 0.45,
+              bBox.max.z + 0.08,
+            );
+            rot = new Euler(0, Math.PI, customRotZ);
           } else {
             pos = new Vector3(posX, posY, posZ);
             rot = new Euler(rotX, rotY, customRotZ);
           }
         } else {
           // Cars modeled along Z in local geometry (Porsche 911, Audi R8, Corvette C8, Lamborghini Revuelto)
+          // Front is +Z, Rear is -Z. Left door is -X, Right door is +X.
           if (decal.preset === "roof") {
             pos = new Vector3(
               center.x,
@@ -2106,11 +2113,13 @@ export function CarDecals({
   bodyMeshes,
   mattePaint,
   targetScale = 55.32,
+  isXLonger = false,
 }: {
   stickers: DecalConfig[];
   bodyMeshes: Mesh[];
   mattePaint: boolean;
   targetScale?: number;
+  isXLonger?: boolean;
 }) {
   if (
     !stickers ||
@@ -2122,13 +2131,6 @@ export function CarDecals({
   }
 
   const primaryMesh = bodyMeshes[0];
-  const spanX = primaryMesh.geometry?.boundingBox
-    ? primaryMesh.geometry.boundingBox.max.x - primaryMesh.geometry.boundingBox.min.x
-    : 1;
-  const spanZ = primaryMesh.geometry?.boundingBox
-    ? primaryMesh.geometry.boundingBox.max.z - primaryMesh.geometry.boundingBox.min.z
-    : 1;
-  const isXLonger = spanX > spanZ;
 
   return (
     <>
@@ -2146,6 +2148,7 @@ export function CarDecals({
               decal={st}
               mattePaint={mattePaint}
               targetScale={targetScale}
+              isXLonger={isXLonger}
             />
             {st.mirrored && (
               <DecalItem
@@ -2168,6 +2171,7 @@ export function CarDecals({
                 }}
                 mattePaint={mattePaint}
                 targetScale={targetScale}
+                isXLonger={isXLonger}
               />
             )}
           </Fragment>
@@ -2215,6 +2219,7 @@ export function Model({
     const paintSet = new Set<MeshPhysicalMaterial>();
     const accentSet = new Set<MeshPhysicalMaterial>();
     const glassSet = new Set<MeshPhysicalMaterial>();
+    const headlightSet = new Set<MeshPhysicalMaterial>();
     const bodyMeshes: Mesh[] = [];
     const clonedByOrig = new Map<MeshStandardMaterial, MeshPhysicalMaterial>();
     const specialClones = new Map<string, MeshPhysicalMaterial>();
@@ -2447,16 +2452,26 @@ export function Model({
               applyMetallicWheelFinish(mat);
             } else if (cat === "glass") {
               const nameLower = (mat.name || "").toLowerCase();
+              const isHeadlight =
+                nameLower.includes("headlight") ||
+                nameLower.includes("head light") ||
+                nameLower.includes("lens") ||
+                nameLower.includes("fog") ||
+                (modelInfo.id === "audi-rs6" && nameLower === "glass") ||
+                (modelInfo.id === "audi-rs8" && nameLower === "glass") ||
+                (modelInfo.id === "porsche-911" && nameLower === "glass.001");
+
               const isCabinGlass =
-                !nameLower.includes("headlight") &&
+                !isHeadlight &&
                 !nameLower.includes("taillight") &&
                 !nameLower.includes("backlight") &&
-                !nameLower.includes("fog") &&
-                !nameLower.includes("lens") &&
                 !nameLower.includes("mirror") &&
                 !nameLower.includes("red car") &&
                 !nameLower.includes("black window");
-              if (isCabinGlass) {
+
+              if (isHeadlight) {
+                headlightSet.add(mat);
+              } else if (isCabinGlass) {
                 glassSet.add(mat);
               }
             } else {
@@ -2642,9 +2657,21 @@ export function Model({
       }
     });
 
+    // Sort activeBodyMeshes descending by bounding box volume so the primary exterior body shell is ALWAYS bodyMeshes[0]
+    activeBodyMeshes.sort((a, b) => {
+      a.geometry.computeBoundingBox();
+      b.geometry.computeBoundingBox();
+      const bA = a.geometry.boundingBox;
+      const bB = b.geometry.boundingBox;
+      const volA = bA ? (bA.max.x - bA.min.x) * (bA.max.y - bA.min.y) * (bA.max.z - bA.min.z) : 0;
+      const volB = bB ? (bB.max.x - bB.min.x) * (bB.max.y - bB.min.y) * (bB.max.z - bB.min.z) : 0;
+      return volB - volA;
+    });
+
     root.userData.paintMaterials = Array.from(paintSet);
     root.userData.accentMaterials = Array.from(accentSet);
     root.userData.glassMaterials = Array.from(glassSet);
+    root.userData.headlightMaterials = Array.from(headlightSet);
     root.userData.bodyMeshes =
       activeBodyMeshes.length > 0 ? activeBodyMeshes : bodyMeshes;
 
@@ -2677,49 +2704,18 @@ export function Model({
 
   // Pre-filter and cache cabin glass materials once per car model load (never traversed at runtime or per frame)
   const cabinGlassMaterials = useMemo(() => {
-    if (!scene) return [];
-    const cached = scene.userData?.glassMaterials as (MeshPhysicalMaterial | MeshStandardMaterial)[] | undefined;
-    if (cached && cached.length > 0) return cached;
-
-    // Fallback: one-time scan on initial model load only
-    const glassMats: (MeshPhysicalMaterial | MeshStandardMaterial)[] = [];
-    scene.traverse((child) => {
-      if (child instanceof Mesh && child.material) {
-        const mats = Array.isArray(child.material)
-          ? child.material
-          : [child.material];
-        for (let i = 0; i < mats.length; i++) {
-          const m = mats[i];
-          if (!m || !(m instanceof MeshPhysicalMaterial || m instanceof MeshStandardMaterial)) continue;
-          const name = (m.name || "").toLowerCase();
-          const childName = (child.name || "").toLowerCase();
-          const isCabinGlass =
-            (name.includes("glass") ||
-              name.includes("window") ||
-              name.includes("windshield") ||
-              childName.includes("glass") ||
-              childName.includes("window")) &&
-            !name.includes("headlight") &&
-            !name.includes("taillight") &&
-            !name.includes("backlight") &&
-            !name.includes("red car") &&
-            !name.includes("mirror") &&
-            !name.includes("black window");
-
-          if (isCabinGlass && !glassMats.includes(m)) {
-            glassMats.push(m);
-          }
-        }
-      }
-    });
-    scene.userData.glassMaterials = glassMats;
-    return glassMats;
+    return (scene?.userData?.glassMaterials as (MeshPhysicalMaterial | MeshStandardMaterial)[]) || [];
   }, [scene]);
 
-  // Window tint reactive effect: executes ONLY when the user clicks a tint option (0 scene traversals, zero per-frame cost)
+  // Pre-filter and cache headlight optical materials once per car model load (never traversed at runtime or per frame)
+  const headlightMaterials = useMemo(() => {
+    return (scene?.userData?.headlightMaterials as (MeshPhysicalMaterial | MeshStandardMaterial)[]) || [];
+  }, [scene]);
+
+  // Window tint reactive effect: executes ONLY when cabin window tint changes (defaults to "clear")
   useEffect(() => {
     if (cabinGlassMaterials.length === 0) return;
-    const tint = config.windowTint || (config.tintedWindows ? "smoke" : "smoke");
+    const tint = config.windowTint || "clear";
 
     for (let i = 0; i < cabinGlassMaterials.length; i++) {
       const m = cabinGlassMaterials[i];
@@ -2727,24 +2723,55 @@ export function Model({
       m.depthWrite = false;
       if (tint === "limo") {
         m.color.set("#020304");
-        m.opacity = 0.95;
+        m.opacity = 0.94;
         m.roughness = 0.01;
         m.metalness = 0.7;
-      } else if (tint === "clear") {
-        m.color.set("#252c38");
-        m.opacity = 0.20;
-        m.roughness = 0.05;
-        m.metalness = 0.15;
-      } else {
-        // Smoke (35% tint)
+      } else if (tint === "smoke") {
         m.color.set("#06080b");
-        m.opacity = 0.75;
+        m.opacity = 0.70;
         m.roughness = 0.02;
         m.metalness = 0.45;
+      } else {
+        // Factory Clear Glass (70% VLT) - DEFAULT
+        m.color.set("#252c38");
+        m.opacity = 0.18;
+        m.roughness = 0.05;
+        m.metalness = 0.1;
       }
       m.needsUpdate = true;
     }
-  }, [cabinGlassMaterials, config.windowTint, config.tintedWindows]);
+  }, [cabinGlassMaterials, config.windowTint]);
+
+  // Headlight lens treatment: 100% separate from cabin windows and windshields
+  useEffect(() => {
+    if (headlightMaterials.length === 0) return;
+    const tint = config.headlightTint || "clear";
+
+    for (let i = 0; i < headlightMaterials.length; i++) {
+      const m = headlightMaterials[i];
+      m.transparent = true;
+      m.depthWrite = false;
+      if (tint === "smoke") {
+        m.color.set("#12141a");
+        m.opacity = 0.65;
+        m.roughness = 0.04;
+        m.metalness = 0.3;
+      } else if (tint === "yellow") {
+        // GT3 / Endurance Racing Amber-Yellow Lens
+        m.color.set("#ffb000");
+        m.opacity = 0.50;
+        m.roughness = 0.03;
+        m.metalness = 0.2;
+      } else {
+        // Factory Clear Optical Lens (Default)
+        m.color.set("#f0f4ff");
+        m.opacity = 0.18;
+        m.roughness = 0.03;
+        m.metalness = 0.1;
+      }
+      m.needsUpdate = true;
+    }
+  }, [headlightMaterials, config.headlightTint]);
 
   // Immediately apply matte vs metallic PBR finish whenever mattePaint, mainColor, or scene changes
   useEffect(() => {
@@ -2948,6 +2975,7 @@ export function Model({
         bodyMeshes={bodyMeshes}
         mattePaint={Boolean(config.mattePaint)}
         targetScale={targetScale}
+        isXLonger={Boolean(modelInfo.rotationY && Math.abs(modelInfo.rotationY - Math.PI / 2) < 0.1)}
       />
     </group>
   );
