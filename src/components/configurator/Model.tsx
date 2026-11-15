@@ -2736,6 +2736,15 @@ export function Model({
     }
   }, [config.selectedModel, carRotationRef]);
 
+  const paintMats = useMemo(
+    () => (scene?.userData?.paintMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS,
+    [scene],
+  );
+  const accentMats = useMemo(
+    () => (scene?.userData?.accentMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS,
+    [scene],
+  );
+
   useFrame((state, delta) => {
     if (!wrapperRef.current) return;
 
@@ -2785,14 +2794,6 @@ export function Model({
       state.gl.shadowMap.needsUpdate = true;
     }
 
-    const carRoot = wrapperRef.current.children[0];
-    const paintMats =
-      (carRoot?.userData?.paintMaterials as MeshPhysicalMaterial[]) ||
-      EMPTY_MATS;
-    const accentMats =
-      (carRoot?.userData?.accentMaterials as MeshPhysicalMaterial[]) ||
-      EMPTY_MATS;
-
     // Immediate initial color sync on model load / switch
     if (needsImmediateColorSyncRef.current) {
       needsImmediateColorSyncRef.current = false;
@@ -2801,33 +2802,6 @@ export function Model({
       }
       for (let i = 0; i < accentMats.length; i++) {
         accentMats[i].color.copy(targetAccentColor.current);
-      }
-    }
-
-    // Reactively update matte vs metallic PBR material finish
-    if (lastAppliedMatteRef.current !== config.mattePaint) {
-      lastAppliedMatteRef.current = config.mattePaint ?? false;
-      const isMatte = Boolean(config.mattePaint);
-      for (let i = 0; i < paintMats.length; i++) {
-        const mat = paintMats[i];
-        if (isMatte) {
-          mat.metalness = 0.0;
-          mat.roughness = 0.9;
-          mat.clearcoat = 0.0;
-          mat.clearcoatRoughness = 0.0;
-          mat.specularIntensity = 0.12;
-          mat.envMapIntensity = 0.3;
-          mat.metalnessMap = null;
-          mat.roughnessMap = null;
-        } else {
-          mat.metalness = 0.68;
-          mat.roughness = 0.22;
-          mat.clearcoat = 1.0;
-          mat.clearcoatRoughness = 0.04;
-          mat.specularIntensity = 1.0;
-          mat.envMapIntensity = 1.25;
-        }
-        mat.needsUpdate = true;
       }
     }
 
@@ -3287,68 +3261,68 @@ export function Showroom({
       }
     }
 
-    // Steady, pure white illumination for the logo (no pulsing)
+    // Steady, pure white illumination for the logo (gated when converged)
     const logoMats =
       (showroomRoot?.userData?.logoMaterials as MeshPhysicalMaterial[]) ||
       EMPTY_MATS;
     const targetLogoEmissive = lightIntensity * 3.2;
-    for (let i = 0; i < logoMats.length; i++) {
-      const mat = logoMats[i];
-      mat.color.set("#ffffff");
-      mat.emissive.set("#ffffff");
-      easing.damp(mat, "emissiveIntensity", targetLogoEmissive, 0.2, delta);
+    if (
+      logoMats.length > 0 &&
+      Math.abs(logoMats[0].emissiveIntensity - targetLogoEmissive) > 0.01
+    ) {
+      for (let i = 0; i < logoMats.length; i++) {
+        easing.damp(logoMats[i], "emissiveIntensity", targetLogoEmissive, 0.2, delta);
+      }
     }
 
-    // Steady white light shining from the wall logo onto the car
-    if (logoLightRef.current) {
-      logoLightRef.current.color.set("#ffffff");
-      easing.damp(
-        logoLightRef.current,
-        "intensity",
-        lightIntensity * 12.0,
-        0.2,
-        delta,
-      );
+    // Steady white light shining from the wall logo onto the car (gated when converged)
+    const targetLogoLight = lightIntensity * 12.0;
+    if (logoLightRef.current && Math.abs(logoLightRef.current.intensity - targetLogoLight) > 0.01) {
+      easing.damp(logoLightRef.current, "intensity", targetLogoLight, 0.2, delta);
     }
-    if (logoSpotRef.current) {
-      logoSpotRef.current.color.set("#ffffff");
-      easing.damp(
-        logoSpotRef.current,
-        "intensity",
-        lightIntensity * 14.0,
-        0.2,
-        delta,
-      );
+    const targetLogoSpot = lightIntensity * 14.0;
+    if (logoSpotRef.current && Math.abs(logoSpotRef.current.intensity - targetLogoSpot) > 0.01) {
+      easing.damp(logoSpotRef.current, "intensity", targetLogoSpot, 0.2, delta);
     }
-    if (logoWashRef.current) {
-      logoWashRef.current.color.set("#ffffff");
-      easing.damp(
-        logoWashRef.current,
-        "intensity",
-        lightIntensity * 5.5,
-        0.2,
-        delta,
-      );
+    const targetLogoWash = lightIntensity * 5.5;
+    if (logoWashRef.current && Math.abs(logoWashRef.current.intensity - targetLogoWash) > 0.01) {
+      easing.damp(logoWashRef.current, "intensity", targetLogoWash, 0.2, delta);
     }
 
-    // Dynamically damp the showroom walls to match the vehicle's body color
+    // Dynamically damp the showroom walls to match the vehicle's body color (gated when converged)
     const cubeMat = showroomRoot?.userData?.cubeInteriorMat as
       | MeshPhysicalMaterial
       | undefined;
     if (cubeMat) {
-      easing.dampC(cubeMat.color, targetWallColor, 0.25, delta);
+      const cDiff =
+        (cubeMat.color.r - targetWallColor.r) ** 2 +
+        (cubeMat.color.g - targetWallColor.g) ** 2 +
+        (cubeMat.color.b - targetWallColor.b) ** 2;
+      if (cDiff > 1e-6) {
+        easing.dampC(cubeMat.color, targetWallColor, 0.25, delta);
+      }
     }
 
-    // Soft car-colored ambient bounce in the studio
+    // Soft car-colored ambient bounce in the studio (gated when converged)
     if (studioBounceRef.current) {
-      easing.dampC(studioBounceRef.current.color, targetWallColor, 0.25, delta);
-      easing.damp(
-        studioBounceRef.current,
-        "intensity",
-        lightIntensity * 2.8,
-        0.2,
-        delta,
-      );
+      const bColor = studioBounceRef.current.color;
+      const bDiff =
+        (bColor.r - targetWallColor.r) ** 2 +
+        (bColor.g - targetWallColor.g) ** 2 +
+        (bColor.b - targetWallColor.b) ** 2;
+      if (bDiff > 1e-6) {
+        easing.dampC(studioBounceRef.current.color, targetWallColor, 0.25, delta);
+      }
+      const targetBounce = lightIntensity * 2.8;
+      if (Math.abs(studioBounceRef.current.intensity - targetBounce) > 0.01) {
+        easing.damp(
+          studioBounceRef.current,
+          "intensity",
+          targetBounce,
+          0.2,
+          delta,
+        );
+      }
     }
   });
 
