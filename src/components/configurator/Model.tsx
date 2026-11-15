@@ -1915,10 +1915,12 @@ function DecalItem({
   bodyMesh,
   decal,
   mattePaint,
+  targetScale = 55.32,
 }: {
   bodyMesh: Mesh;
   decal: DecalConfig;
   mattePaint: boolean;
+  targetScale?: number;
 }) {
   const scaleX = decal.scale?.[0] || 34;
   const rotX = decal.rotation?.[0] || 0;
@@ -1929,7 +1931,7 @@ function DecalItem({
   const posZ = decal.position?.[2] || 0;
 
   // Fixed 2-element key so dependency array size NEVER changes between renders
-  const decalKey = `${decal.id}:${decal.textureUrl}:${decal.preset || "none"}:${scaleX}:${rotX.toFixed(3)}:${rotY.toFixed(3)}:${rotZ.toFixed(3)}:${posX.toFixed(3)}:${posY.toFixed(3)}:${posZ.toFixed(3)}:${Boolean(decal.mirrored)}:${mattePaint}`;
+  const decalKey = `${decal.id}:${decal.textureUrl}:${decal.preset || "none"}:${scaleX}:${rotX.toFixed(3)}:${rotY.toFixed(3)}:${rotZ.toFixed(3)}:${posX.toFixed(3)}:${posY.toFixed(3)}:${posZ.toFixed(3)}:${Boolean(decal.mirrored)}:${mattePaint}:${targetScale.toFixed(4)}`;
 
   useEffect(() => {
     if (!bodyMesh || !bodyMesh.geometry) return;
@@ -1949,11 +1951,20 @@ function DecalItem({
         const bBox = bodyMesh.geometry.boundingBox;
         if (!bBox) return;
 
-        const carLen = Math.max(1, bBox.max.z - bBox.min.z);
+        const spanX = Math.max(0.1, bBox.max.x - bBox.min.x);
+        const spanZ = Math.max(0.1, bBox.max.z - bBox.min.z);
+        const isXLonger = spanX > spanZ;
+        const carLen = Math.max(spanX, spanZ);
         const carHeight = Math.max(0.5, bBox.max.y - bBox.min.y);
         const center = bBox.getCenter(new Vector3());
 
-        const baseSize = carLen * 0.16;
+        // Normalized world decal base size:
+        // On Porsche 911 (reference vehicle, 4.52m length with targetScale 55.32),
+        // at slider scale 34, the sticker's world size in the showroom is 40.0 units (16% of car length).
+        // By dividing the constant world base size (40.0) by targetScale, the sticker renders at the
+        // EXACT identical physical size in the viewport across all cars (RS6, RS8, R8, 911, Corvette, Lamborghini).
+        const safeTargetScale = targetScale > 0 ? targetScale : 55.32;
+        const baseSize = 40.0 / safeTargetScale;
         const scaleMult = scaleX / 34;
         const decalWidth = baseSize * scaleMult;
         const decalHeight = baseSize * scaleMult;
@@ -1965,37 +1976,74 @@ function DecalItem({
 
         const customRotZ = rotZ;
 
-        if (decal.preset === "roof") {
-          pos = new Vector3(
-            center.x,
-            bBox.max.y - 0.01,
-            center.z - carLen * 0.05,
-          );
-          rot = new Euler(Math.PI / 2, 0, customRotZ);
-        } else if (decal.preset === "hood") {
-          pos = new Vector3(
-            center.x,
-            bBox.min.y + carHeight * 0.62,
-            center.z + carLen * 0.28,
-          );
-          rot = new Euler(Math.PI / 2.3, 0, customRotZ);
-        } else if (decal.preset === "rightDoor") {
-          pos = new Vector3(
-            bBox.max.x - 0.01,
-            bBox.min.y + carHeight * 0.45,
-            center.z,
-          );
-          rot = new Euler(0, -Math.PI / 2, customRotZ);
-        } else if (decal.preset === "leftDoor") {
-          pos = new Vector3(
-            bBox.min.x + 0.01,
-            bBox.min.y + carHeight * 0.45,
-            center.z,
-          );
-          rot = new Euler(0, Math.PI / 2, customRotZ);
+        if (isXLonger) {
+          // Cars modeled along X in local geometry (Audi RS6 Avant, Audi RS8 Sport)
+          if (decal.preset === "roof") {
+            pos = new Vector3(
+              center.x + carLen * 0.05,
+              bBox.max.y - 0.01,
+              center.z,
+            );
+            rot = new Euler(Math.PI / 2, 0, customRotZ - Math.PI / 2);
+          } else if (decal.preset === "hood") {
+            pos = new Vector3(
+              center.x - carLen * 0.28,
+              bBox.min.y + carHeight * 0.62,
+              center.z,
+            );
+            rot = new Euler(Math.PI / 2.3, 0, customRotZ - Math.PI / 2);
+          } else if (decal.preset === "rightDoor") {
+            pos = new Vector3(
+              center.x,
+              bBox.min.y + carHeight * 0.45,
+              bBox.min.z + 0.01,
+            );
+            rot = new Euler(0, Math.PI, customRotZ);
+          } else if (decal.preset === "leftDoor") {
+            pos = new Vector3(
+              center.x,
+              bBox.min.y + carHeight * 0.45,
+              bBox.max.z - 0.01,
+            );
+            rot = new Euler(0, 0, customRotZ);
+          } else {
+            pos = new Vector3(posX, posY, posZ);
+            rot = new Euler(rotX, rotY, customRotZ);
+          }
         } else {
-          pos = new Vector3(posX, posY, posZ);
-          rot = new Euler(rotX, rotY, customRotZ);
+          // Cars modeled along Z in local geometry (Porsche 911, Audi R8, Corvette C8, Lamborghini Revuelto)
+          if (decal.preset === "roof") {
+            pos = new Vector3(
+              center.x,
+              bBox.max.y - 0.01,
+              center.z - carLen * 0.05,
+            );
+            rot = new Euler(Math.PI / 2, 0, customRotZ);
+          } else if (decal.preset === "hood") {
+            pos = new Vector3(
+              center.x,
+              bBox.min.y + carHeight * 0.62,
+              center.z + carLen * 0.28,
+            );
+            rot = new Euler(Math.PI / 2.3, 0, customRotZ);
+          } else if (decal.preset === "rightDoor") {
+            pos = new Vector3(
+              bBox.max.x - 0.01,
+              bBox.min.y + carHeight * 0.45,
+              center.z,
+            );
+            rot = new Euler(0, -Math.PI / 2, customRotZ);
+          } else if (decal.preset === "leftDoor") {
+            pos = new Vector3(
+              bBox.min.x + 0.01,
+              bBox.min.y + carHeight * 0.45,
+              center.z,
+            );
+            rot = new Euler(0, Math.PI / 2, customRotZ);
+          } else {
+            pos = new Vector3(posX, posY, posZ);
+            rot = new Euler(rotX, rotY, customRotZ);
+          }
         }
 
         const savedMW = bodyMesh.matrixWorld.clone();
@@ -2057,10 +2105,12 @@ export function CarDecals({
   stickers,
   bodyMeshes,
   mattePaint,
+  targetScale = 55.32,
 }: {
   stickers: DecalConfig[];
   bodyMeshes: Mesh[];
   mattePaint: boolean;
+  targetScale?: number;
 }) {
   if (
     !stickers ||
@@ -2072,6 +2122,13 @@ export function CarDecals({
   }
 
   const primaryMesh = bodyMeshes[0];
+  const spanX = primaryMesh.geometry?.boundingBox
+    ? primaryMesh.geometry.boundingBox.max.x - primaryMesh.geometry.boundingBox.min.x
+    : 1;
+  const spanZ = primaryMesh.geometry?.boundingBox
+    ? primaryMesh.geometry.boundingBox.max.z - primaryMesh.geometry.boundingBox.min.z
+    : 1;
+  const isXLonger = spanX > spanZ;
 
   return (
     <>
@@ -2088,6 +2145,7 @@ export function CarDecals({
               bodyMesh={targetMesh}
               decal={st}
               mattePaint={mattePaint}
+              targetScale={targetScale}
             />
             {st.mirrored && (
               <DecalItem
@@ -2101,10 +2159,15 @@ export function CarDecals({
                       : st.preset === "rightDoor"
                         ? "leftDoor"
                         : st.preset,
-                  position: [-st.position[0], st.position[1], st.position[2]],
-                  rotation: [st.rotation[0], -st.rotation[1], -st.rotation[2]],
+                  position: isXLonger
+                    ? [st.position[0], st.position[1], -st.position[2]]
+                    : [-st.position[0], st.position[1], st.position[2]],
+                  rotation: isXLonger
+                    ? [-st.rotation[0], -st.rotation[1], st.rotation[2]]
+                    : [st.rotation[0], -st.rotation[1], -st.rotation[2]],
                 }}
                 mattePaint={mattePaint}
+                targetScale={targetScale}
               />
             )}
           </Fragment>
@@ -2884,6 +2947,7 @@ export function Model({
         stickers={config.stickers || []}
         bodyMeshes={bodyMeshes}
         mattePaint={Boolean(config.mattePaint)}
+        targetScale={targetScale}
       />
     </group>
   );
