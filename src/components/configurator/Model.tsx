@@ -1960,13 +1960,12 @@ function DecalItem({
         const carHeight = Math.max(0.5, bBox.max.y - bBox.min.y);
         const center = bBox.getCenter(new Vector3());
 
-        // Normalized world decal base size:
-        // On Porsche 911 (reference vehicle, 4.52m length with targetScale 55.32),
-        // at slider scale 34, the sticker's world size in the showroom is 40.0 units (16% of car length).
-        // By dividing the constant world base size (40.0) by targetScale, the sticker renders at the
-        // EXACT identical physical size in the viewport across all cars (RS6, RS8, R8, 911, Corvette, Lamborghini).
-        const safeTargetScale = targetScale > 0 ? targetScale : 55.32;
-        const baseSize = 40.0 / safeTargetScale;
+        // Proportional decal base size:
+        // By scaling baseSize directly from carLen (16% of vehicle length in local geometry coordinates),
+        // decals render with identical visual proportions across all vehicles regardless of whether
+        // their source GLTF was exported in meters (911, RS8, R8, Corvette, Lamborghini ~4.5m)
+        // or centimeters (Audi RS6 Avant ~496cm with 0.01 parent node scale).
+        const baseSize = carLen * 0.16;
         const scaleMult = scaleX / 34;
         const decalWidth = baseSize * scaleMult;
         const decalHeight = baseSize * scaleMult;
@@ -1985,7 +1984,7 @@ function DecalItem({
           if (decal.preset === "roof") {
             pos = new Vector3(
               center.x + carLen * 0.05,
-              bBox.max.y - 0.01,
+              bBox.max.y - baseSize * 0.02,
               center.z,
             );
             rot = new Euler(Math.PI / 2, 0, customRotZ);
@@ -2001,7 +2000,7 @@ function DecalItem({
             pos = new Vector3(
               center.x,
               bBox.min.y + carHeight * 0.45,
-              bBox.min.z - 0.08,
+              bBox.min.z - baseSize * 0.1,
             );
             rot = new Euler(0, 0, customRotZ);
           } else if (decal.preset === "leftDoor") {
@@ -2009,7 +2008,7 @@ function DecalItem({
             pos = new Vector3(
               center.x,
               bBox.min.y + carHeight * 0.45,
-              bBox.max.z + 0.08,
+              bBox.max.z + baseSize * 0.1,
             );
             rot = new Euler(0, Math.PI, customRotZ);
           } else {
@@ -2022,7 +2021,7 @@ function DecalItem({
           if (decal.preset === "roof") {
             pos = new Vector3(
               center.x,
-              bBox.max.y - 0.01,
+              bBox.max.y - baseSize * 0.02,
               center.z - carLen * 0.05,
             );
             rot = new Euler(Math.PI / 2, 0, customRotZ);
@@ -2035,14 +2034,14 @@ function DecalItem({
             rot = new Euler(Math.PI / 2.3, 0, customRotZ);
           } else if (decal.preset === "rightDoor") {
             pos = new Vector3(
-              bBox.max.x - 0.01,
+              bBox.max.x + baseSize * 0.1,
               bBox.min.y + carHeight * 0.45,
               center.z,
             );
             rot = new Euler(0, -Math.PI / 2, customRotZ);
           } else if (decal.preset === "leftDoor") {
             pos = new Vector3(
-              bBox.min.x + 0.01,
+              bBox.min.x - baseSize * 0.1,
               bBox.min.y + carHeight * 0.45,
               center.z,
             );
