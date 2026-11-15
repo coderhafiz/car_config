@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+
+const emptySubscribe = () => () => {};
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -96,10 +98,11 @@ export default function SpecificationSheet({
     };
   }, [isOpen, getSnapshots]);
 
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const hasMounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
 
   // Lock background scroll when checkout modal or enlarged lightbox is open
   useEffect(() => {
@@ -656,7 +659,7 @@ export default function SpecificationSheet({
       </main>
 
       {/* Enlarged Image Lightbox */}
-      {mounted && typeof document !== "undefined" && createPortal(
+      {hasMounted && typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {isEnlarged && snapshots && (
             <motion.div
@@ -724,7 +727,7 @@ export default function SpecificationSheet({
       )}
 
       {/* Checkout / Commission Modal */}
-      {mounted && typeof document !== "undefined" && createPortal(
+      {hasMounted && typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {showCheckoutModal && (
             <motion.div
