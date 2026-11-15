@@ -235,7 +235,24 @@ function SceneContent({
       const savedRot = currentCamera.rotation.clone();
       const savedFov = currentCamera.fov;
 
-      const snapCamera = new THREE.PerspectiveCamera(32, 16 / 10, 1, 2000);
+      const originalSize = new THREE.Vector2();
+      renderer.getSize(originalSize);
+      const originalPixelRatio = renderer.getPixelRatio();
+
+      // Enforce a fixed 16:10 studio snapshot buffer so mobile portrait viewports NEVER stretch or deform
+      const snapWidth = 960;
+      const snapHeight = 600;
+
+      renderer.setPixelRatio(1);
+      renderer.setSize(snapWidth, snapHeight, false);
+
+      const snapCamera = new THREE.PerspectiveCamera(
+        32,
+        snapWidth / snapHeight,
+        1,
+        2000,
+      );
+      snapCamera.updateProjectionMatrix();
 
       const theta = carRotationRef.current || 0;
       const cosT = Math.cos(theta);
@@ -279,9 +296,14 @@ function SceneContent({
       // Restore studio props
       hiddenProps.forEach((obj) => (obj.visible = true));
 
+      // Restore original renderer buffer dimensions, pixel ratio, and current camera
+      renderer.setPixelRatio(originalPixelRatio);
+      renderer.setSize(originalSize.x, originalSize.y, false);
+
       currentCamera.position.copy(savedPos);
       currentCamera.rotation.copy(savedRot);
       currentCamera.fov = savedFov;
+      currentCamera.updateProjectionMatrix();
       currentCamera.updateMatrixWorld();
       renderer.render(scene, currentCamera);
 

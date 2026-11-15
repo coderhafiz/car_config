@@ -280,7 +280,7 @@ export default function SpecificationSheet({
                       : "border-white/10 hover:border-white/30 bg-[#091016]/80"
                   }`}
                 >
-                  <div className="aspect-16/10 w-full relative flex items-center justify-center bg-[#070b0e] overflow-hidden">
+                  <div className="aspect-[16/10] w-full relative flex items-center justify-center bg-[#070b0e] overflow-hidden">
                     {snapUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
