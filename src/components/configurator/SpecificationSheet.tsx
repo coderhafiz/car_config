@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useSyncExternalStore } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 
 const emptySubscribe = () => () => {};
@@ -422,12 +427,13 @@ export default function SpecificationSheet({
                       {(config.windowTint || "clear") === "limo"
                         ? "Limo Black (5%)"
                         : (config.windowTint || "clear") === "smoke"
-                        ? "Smoke Tint (35%)"
-                        : "Factory Clear (70%)"}
+                          ? "Smoke Tint (35%)"
+                          : "Factory Clear (70%)"}
                     </span>
                   </div>
                   <span className="text-[10px] text-white/40 block">
-                    High-performance UV solar protection cabin glazing with anti-glare finish.
+                    High-performance UV solar protection cabin glazing with
+                    anti-glare finish.
                   </span>
                 </div>
                 {/* Headlight Lens Treatment */}
@@ -440,12 +446,13 @@ export default function SpecificationSheet({
                       {(config.headlightTint || "clear") === "smoke"
                         ? "Competition Smoked"
                         : (config.headlightTint || "clear") === "yellow"
-                        ? "GT3 Endurance Yellow"
-                        : "Factory Optical Clear"}
+                          ? "GT3 Endurance Yellow"
+                          : "Factory Optical Clear"}
                     </span>
                   </div>
                   <span className="text-[10px] text-white/40 block">
-                    Aerospace-grade polycarbonate lens coating with precision optical transparency.
+                    Aerospace-grade polycarbonate lens coating with precision
+                    optical transparency.
                   </span>
                 </div>
               </div>
@@ -659,317 +666,327 @@ export default function SpecificationSheet({
       </main>
 
       {/* Enlarged Image Lightbox */}
-      {hasMounted && typeof document !== "undefined" && createPortal(
-        <AnimatePresence>
-          {isEnlarged && snapshots && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-8"
-              onClick={() => setIsEnlarged(false)}
-            >
+      {hasMounted &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {isEnlarged && snapshots && (
               <motion.div
-                initial={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.95 }}
-                className="relative max-w-6xl w-full flex flex-col items-center gap-4"
-                onClick={(e) => e.stopPropagation()}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-9999 bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-8"
+                onClick={() => setIsEnlarged(false)}
               >
-                <div className="w-full flex items-center justify-between text-white">
-                  <div>
-                    <span className="text-xs uppercase font-mono text-[#d16b54] tracking-widest block">
-                      Bespoke 3D Studio Render
-                    </span>
-                    <h3 className="text-lg font-bold">
-                      {modelInfo.name} —{" "}
-                      {viewCards.find((v) => v.key === activeView)?.label}
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => setIsEnlarged(false)}
-                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="w-full rounded-xl overflow-hidden border border-white/20 bg-black">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={snapshots[activeView]}
-                    alt="Enlarged view"
-                    className="w-full max-h-[75vh] object-contain mx-auto"
-                  />
-                </div>
-
-                {/* View Switcher in Lightbox */}
-                <div className="flex items-center gap-2 mt-2">
-                  {viewCards.map((v) => (
+                <motion.div
+                  initial={{ scale: 0.95 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0.95 }}
+                  className="relative max-w-6xl w-full flex flex-col items-center gap-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="w-full flex items-center justify-between text-white">
+                    <div>
+                      <span className="text-xs uppercase font-mono text-[#d16b54] tracking-widest block">
+                        Bespoke 3D Studio Render
+                      </span>
+                      <h3 className="text-lg font-bold">
+                        {modelInfo.name} —{" "}
+                        {viewCards.find((v) => v.key === activeView)?.label}
+                      </h3>
+                    </div>
                     <button
-                      key={v.key}
-                      onClick={() => setActiveView(v.key)}
-                      className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer ${
-                        activeView === v.key
-                          ? "bg-[#d16b54] text-white"
-                          : "bg-white/10 hover:bg-white/20 text-white/70"
-                      }`}
+                      onClick={() => setIsEnlarged(false)}
+                      className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer"
                     >
-                      {v.label}
+                      <X className="w-4 h-4" />
                     </button>
-                  ))}
-                </div>
+                  </div>
+
+                  <div className="w-full rounded-xl overflow-hidden border border-white/20 bg-black">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={snapshots[activeView]}
+                      alt="Enlarged view"
+                      className="w-full max-h-[75vh] object-contain mx-auto"
+                    />
+                  </div>
+
+                  {/* View Switcher in Lightbox */}
+                  <div className="flex items-center gap-2 mt-2">
+                    {viewCards.map((v) => (
+                      <button
+                        key={v.key}
+                        onClick={() => setActiveView(v.key)}
+                        className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer ${
+                          activeView === v.key
+                            ? "bg-[#d16b54] text-white"
+                            : "bg-white/10 hover:bg-white/20 text-white/70"
+                        }`}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
 
       {/* Checkout / Commission Modal */}
-      {hasMounted && typeof document !== "undefined" && createPortal(
-        <AnimatePresence>
-          {showCheckoutModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
-            >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative max-w-lg w-full bg-[#0c161d] border border-white/15 rounded-2xl p-6 sm:p-8 space-y-6 shadow-2xl text-white my-8"
-            >
-              <button
-                onClick={() => setShowCheckoutModal(false)}
-                className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer"
+      {hasMounted &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {showCheckoutModal && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-9999 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 overflow-y-auto"
               >
-                <X className="w-3.5 h-3.5" />
-              </button>
-
-              {!orderSubmitted ? (
-                <>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs text-[#d16b54] font-semibold tracking-wider uppercase">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Custom Commission Order</span>
-                    </div>
-                    <h3 className="text-xl font-bold">
-                      Reserve Your Bespoke Build
-                    </h3>
-                    <p className="text-xs text-white/60">
-                      Submit your reservation to commission this{" "}
-                      {modelInfo.name} with your custom finish and liveries.
-                    </p>
-                  </div>
-
-                  {/* Summary Snapshot Bar */}
-                  <div className="p-3.5 rounded-lg bg-black/40 border border-white/10 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="font-semibold block">
-                        {modelInfo.name}
-                      </span>
-                      <span className="text-[11px] text-white/50">
-                        {config.mattePaint ? "Satin Matte" : "Gloss"} •{" "}
-                        {stickerCount} Livery Decal
-                        {stickerCount !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <span className="font-mono font-bold text-base text-[#d16b54]">
-                      ${totalPrice.toLocaleString()}
-                    </span>
-                  </div>
-
-                  <form
-                    onSubmit={handleCheckoutSubmit}
-                    className="space-y-4 text-xs"
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="relative max-w-lg w-full bg-[#0c161d] border border-white/15 rounded-2xl p-6 sm:p-8 space-y-6 shadow-2xl text-white my-8"
+                >
+                  <button
+                    onClick={() => setShowCheckoutModal(false)}
+                    className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer"
                   >
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-white/80">
-                        Full Name
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="e.g. Alexander Vance"
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 focus:border-[#d16b54] focus:outline-none text-white text-xs"
-                      />
-                    </div>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="font-semibold text-white/80">
-                          Email Address
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          value={customerEmail}
-                          onChange={(e) => setCustomerEmail(e.target.value)}
-                          placeholder="client@bespoke.com"
-                          className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 focus:border-[#d16b54] focus:outline-none text-white text-xs"
-                        />
+                  {!orderSubmitted ? (
+                    <>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs text-[#d16b54] font-semibold tracking-wider uppercase">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Custom Commission Order</span>
+                        </div>
+                        <h3 className="text-xl font-bold">
+                          Reserve Your Bespoke Build
+                        </h3>
+                        <p className="text-xs text-white/60">
+                          Submit your reservation to commission this{" "}
+                          {modelInfo.name} with your custom finish and liveries.
+                        </p>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="font-semibold text-white/80">
-                          Phone Number
-                        </label>
-                        <input
-                          type="tel"
-                          required
-                          value={customerPhone}
-                          onChange={(e) => setCustomerPhone(e.target.value)}
-                          placeholder="+1 (555) 019-2834"
-                          className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 focus:border-[#d16b54] focus:outline-none text-white text-xs"
-                        />
+
+                      {/* Summary Snapshot Bar */}
+                      <div className="p-3.5 rounded-lg bg-black/40 border border-white/10 flex items-center justify-between text-xs">
+                        <div>
+                          <span className="font-semibold block">
+                            {modelInfo.name}
+                          </span>
+                          <span className="text-[11px] text-white/50">
+                            {config.mattePaint ? "Satin Matte" : "Gloss"} •{" "}
+                            {stickerCount} Livery Decal
+                            {stickerCount !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold text-base text-[#d16b54]">
+                          ${totalPrice.toLocaleString()}
+                        </span>
+                      </div>
+
+                      <form
+                        onSubmit={handleCheckoutSubmit}
+                        className="space-y-4 text-xs"
+                      >
+                        <div className="space-y-1.5">
+                          <label className="font-semibold text-white/80">
+                            Full Name
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder="e.g. Alexander Vance"
+                            className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 focus:border-[#d16b54] focus:outline-none text-white text-xs"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="font-semibold text-white/80">
+                              Email Address
+                            </label>
+                            <input
+                              type="email"
+                              required
+                              value={customerEmail}
+                              onChange={(e) => setCustomerEmail(e.target.value)}
+                              placeholder="client@bespoke.com"
+                              className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 focus:border-[#d16b54] focus:outline-none text-white text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="font-semibold text-white/80">
+                              Phone Number
+                            </label>
+                            <input
+                              type="tel"
+                              required
+                              value={customerPhone}
+                              onChange={(e) => setCustomerPhone(e.target.value)}
+                              placeholder="+1 (555) 019-2834"
+                              className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 focus:border-[#d16b54] focus:outline-none text-white text-xs"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="font-semibold text-white/80">
+                            Delivery City & Country
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={deliveryCity}
+                            onChange={(e) => setDeliveryCity(e.target.value)}
+                            placeholder="e.g. Zurich, Switzerland / Dubai, UAE"
+                            className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 focus:border-[#d16b54] focus:outline-none text-white text-xs"
+                          />
+                        </div>
+
+                        {/* Payment Method Selector */}
+                        <div className="space-y-2 pt-1">
+                          <label className="font-semibold text-white/80 block">
+                            Commission Deposit Method
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              {
+                                id: "card" as const,
+                                label: "Credit Card",
+                                icon: CreditCard,
+                              },
+                              {
+                                id: "wire" as const,
+                                label: "Bank Wire",
+                                icon: Building,
+                              },
+                              {
+                                id: "crypto" as const,
+                                label: "Crypto / USDC",
+                                icon: ShieldCheck,
+                              },
+                            ].map((m) => {
+                              const Icon = m.icon;
+                              const active = paymentMethod === m.id;
+                              return (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => setPaymentMethod(m.id)}
+                                  className={`py-2 px-2.5 rounded-lg border text-center flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                                    active
+                                      ? "border-[#d16b54] bg-[#d16b54]/20 text-white font-semibold"
+                                      : "border-white/10 hover:border-white/25 bg-black/30 text-white/70"
+                                  }`}
+                                >
+                                  <Icon className="w-4 h-4 text-[#d16b54]" />
+                                  <span className="text-[10px]">{m.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isSubmitting}
+                          className="w-full py-3 rounded-lg font-bold text-xs text-white uppercase tracking-wider flex items-center justify-center gap-2 mt-4 transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer"
+                          style={{
+                            background:
+                              "linear-gradient(135deg, #e07a5f 0%, #c4553b 100%)",
+                            boxShadow: "0 4px 15px rgba(209, 107, 84, 0.4)",
+                          }}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Processing Commission...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4" />
+                              <span>Place Commission Deposit ($5,000)</span>
+                            </>
+                          )}
+                        </button>
+                      </form>
+                    </>
+                  ) : (
+                    <div className="py-6 text-center space-y-4">
+                      <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30">
+                        <CheckCircle2 className="w-8 h-8" />
+                      </div>
+
+                      <div>
+                        <h3 className="text-xl font-bold">
+                          Commission Reserved!
+                        </h3>
+                        <p className="text-xs text-white/60 mt-1 max-w-sm mx-auto">
+                          Thank you,{" "}
+                          <strong className="text-white">
+                            {customerName || "Collector"}
+                          </strong>
+                          . Your bespoke build commission has been registered.
+                        </p>
+                      </div>
+
+                      <div className="p-3.5 rounded-lg bg-black/50 border border-white/10 text-xs text-left space-y-1.5 max-w-sm mx-auto">
+                        <div className="flex justify-between">
+                          <span className="text-white/50">Reference:</span>
+                          <span className="font-mono font-bold text-[#d16b54]">
+                            {orderId}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/50">Vehicle:</span>
+                          <span className="font-semibold">
+                            {modelInfo.name}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/50">
+                            Production Slot:
+                          </span>
+                          <span className="text-emerald-400 font-semibold">
+                            6–8 Weeks Handcrafted
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 justify-center pt-2">
+                        <button
+                          onClick={handlePrint}
+                          className="px-4 py-2 text-xs rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 text-white flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download Receipt</span>
+                        </button>
+                        <button
+                          onClick={handleClose}
+                          className="px-5 py-2 text-xs rounded-lg bg-[#d16b54] text-white font-bold hover:brightness-110 cursor-pointer"
+                        >
+                          Back to Configurator
+                        </button>
                       </div>
                     </div>
-
-                    <div className="space-y-1.5">
-                      <label className="font-semibold text-white/80">
-                        Delivery City & Country
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={deliveryCity}
-                        onChange={(e) => setDeliveryCity(e.target.value)}
-                        placeholder="e.g. Zurich, Switzerland / Dubai, UAE"
-                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/15 focus:border-[#d16b54] focus:outline-none text-white text-xs"
-                      />
-                    </div>
-
-                    {/* Payment Method Selector */}
-                    <div className="space-y-2 pt-1">
-                      <label className="font-semibold text-white/80 block">
-                        Commission Deposit Method
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          {
-                            id: "card" as const,
-                            label: "Credit Card",
-                            icon: CreditCard,
-                          },
-                          {
-                            id: "wire" as const,
-                            label: "Bank Wire",
-                            icon: Building,
-                          },
-                          {
-                            id: "crypto" as const,
-                            label: "Crypto / USDC",
-                            icon: ShieldCheck,
-                          },
-                        ].map((m) => {
-                          const Icon = m.icon;
-                          const active = paymentMethod === m.id;
-                          return (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => setPaymentMethod(m.id)}
-                              className={`py-2 px-2.5 rounded-lg border text-center flex flex-col items-center gap-1 transition-all cursor-pointer ${
-                                active
-                                  ? "border-[#d16b54] bg-[#d16b54]/20 text-white font-semibold"
-                                  : "border-white/10 hover:border-white/25 bg-black/30 text-white/70"
-                              }`}
-                            >
-                              <Icon className="w-4 h-4 text-[#d16b54]" />
-                              <span className="text-[10px]">{m.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full py-3 rounded-lg font-bold text-xs text-white uppercase tracking-wider flex items-center justify-center gap-2 mt-4 transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, #e07a5f 0%, #c4553b 100%)",
-                        boxShadow: "0 4px 15px rgba(209, 107, 84, 0.4)",
-                      }}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>Processing Commission...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          <span>Place Commission Deposit ($5,000)</span>
-                        </>
-                      )}
-                    </button>
-                  </form>
-                </>
-              ) : (
-                <div className="py-6 text-center space-y-4">
-                  <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30">
-                    <CheckCircle2 className="w-8 h-8" />
-                  </div>
-
-                  <div>
-                    <h3 className="text-xl font-bold">Commission Reserved!</h3>
-                    <p className="text-xs text-white/60 mt-1 max-w-sm mx-auto">
-                      Thank you,{" "}
-                      <strong className="text-white">
-                        {customerName || "Collector"}
-                      </strong>
-                      . Your bespoke build commission has been registered.
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-lg bg-black/50 border border-white/10 text-xs text-left space-y-1.5 max-w-sm mx-auto">
-                    <div className="flex justify-between">
-                      <span className="text-white/50">Reference:</span>
-                      <span className="font-mono font-bold text-[#d16b54]">
-                        {orderId}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/50">Vehicle:</span>
-                      <span className="font-semibold">{modelInfo.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/50">Production Slot:</span>
-                      <span className="text-emerald-400 font-semibold">
-                        6–8 Weeks Handcrafted
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 justify-center pt-2">
-                    <button
-                      onClick={handlePrint}
-                      className="px-4 py-2 text-xs rounded-lg border border-white/20 bg-white/5 hover:bg-white/10 text-white flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download Receipt</span>
-                    </button>
-                    <button
-                      onClick={handleClose}
-                      className="px-5 py-2 text-xs rounded-lg bg-[#d16b54] text-white font-bold hover:brightness-110 cursor-pointer"
-                    >
-                      Back to Configurator
-                    </button>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </motion.div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>,
-      document.body
-    )}
     </div>
   );
 }

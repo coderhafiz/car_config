@@ -1,9 +1,26 @@
 "use client";
 
-import { MODELS, ConfigState, preloadCarModel, DEFAULT_STICKERS, DecalConfig } from "./Model";
+import {
+  MODELS,
+  ConfigState,
+  preloadCarModel,
+  DEFAULT_STICKERS,
+  DecalConfig,
+} from "./Model";
 import { Dispatch, SetStateAction, useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, Eye, Sofa, Upload, Trash2, Crosshair, Plus, X, Sparkles } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  Sofa,
+  Upload,
+  Trash2,
+  Crosshair,
+  Plus,
+  X,
+  Sparkles,
+} from "lucide-react";
 import { useTheme } from "../ui/ThemeProvider";
 import { useSafari } from "@/hooks/useSafari";
 
@@ -232,7 +249,9 @@ function ColorSwatchRow({
 }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const matchedSwatch = swatches.find((s) => s.hex.toLowerCase() === current.toLowerCase());
+  const matchedSwatch = swatches.find(
+    (s) => s.hex.toLowerCase() === current.toLowerCase(),
+  );
   const activeColorName =
     isGroupActive && matchedSwatch
       ? matchedSwatch.name
@@ -284,7 +303,8 @@ function ColorSwatchRow({
       </div>
       <div className="flex flex-wrap gap-2">
         {swatches.map((color) => {
-          const isActive = isGroupActive && current.toLowerCase() === color.hex.toLowerCase();
+          const isActive =
+            isGroupActive && current.toLowerCase() === color.hex.toLowerCase();
           return (
             <button
               key={color.hex}
@@ -407,9 +427,10 @@ export default function ControlPanel({
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-
   const [showPlacementPresets, setShowPlacementPresets] = useState(false);
-  const [customGallery, setCustomGallery] = useState<{ id: string; name: string; url: string }[]>(() => {
+  const [customGallery, setCustomGallery] = useState<
+    { id: string; name: string; url: string }[]
+  >(() => {
     if (typeof window === "undefined") return [];
     try {
       const saved = localStorage.getItem("customly_custom_stickers_gallery");
@@ -423,7 +444,10 @@ export default function ControlPanel({
     setCustomGallery((prev) => {
       const updated = prev.filter((p) => p.id !== idToRemove);
       try {
-        localStorage.setItem("customly_custom_stickers_gallery", JSON.stringify(updated));
+        localStorage.setItem(
+          "customly_custom_stickers_gallery",
+          JSON.stringify(updated),
+        );
       } catch {
         // ignore
       }
@@ -433,7 +457,9 @@ export default function ControlPanel({
 
   const handleRemoveStickerById = (idToRemove: string) => {
     setConfig((prev) => {
-      const remaining = (prev.stickers || []).filter((s) => s.id !== idToRemove);
+      const remaining = (prev.stickers || []).filter(
+        (s) => s.id !== idToRemove,
+      );
       const nextActiveId =
         prev.activeStickerId === idToRemove
           ? remaining[0]?.id
@@ -454,19 +480,26 @@ export default function ControlPanel({
   // Car selection: group by brand
   const activeSticker = useMemo(() => {
     const stickers = config.stickers || [];
-    return stickers.find((s) => s.id === config.activeStickerId) || stickers[0] || null;
+    return (
+      stickers.find((s) => s.id === config.activeStickerId) ||
+      stickers[0] ||
+      null
+    );
   }, [config.stickers, config.activeStickerId]);
 
-  const handleAddNewSticker = (template?: { id?: string; url: string; name: string }) => {
+  const handleAddNewSticker = (template?: {
+    id?: string;
+    url: string;
+    name: string;
+  }) => {
     const tmpl = template || DEFAULT_STICKERS[0];
-    const existingPresets = new Set((config.stickers || []).map((s) => s.preset));
-    const candidatePresets: Array<"hood" | "roof" | "rightDoor" | "leftDoor"> = [
-      "hood",
-      "roof",
-      "rightDoor",
-      "leftDoor",
-    ];
-    const nextPreset = candidatePresets.find((p) => !existingPresets.has(p)) || "roof";
+    const existingPresets = new Set(
+      (config.stickers || []).map((s) => s.preset),
+    );
+    const candidatePresets: Array<"hood" | "roof" | "rightDoor" | "leftDoor"> =
+      ["hood", "roof", "rightDoor", "leftDoor"];
+    const nextPreset =
+      candidatePresets.find((p) => !existingPresets.has(p)) || "roof";
 
     const existingIds = new Set((config.stickers || []).map((s) => s.id));
     let count = (config.stickers || []).length + 1;
@@ -493,13 +526,17 @@ export default function ControlPanel({
     }));
   };
 
-  const handleSelectSticker = (stickerId: string, url: string, name: string) => {
+  const handleSelectSticker = (
+    stickerId: string,
+    url: string,
+    name: string,
+  ) => {
     if (activeSticker) {
       // Update active sticker graphic
       setConfig((prev) => ({
         ...prev,
         stickers: (prev.stickers || []).map((s) =>
-          s.id === activeSticker.id ? { ...s, textureUrl: url, name } : s
+          s.id === activeSticker.id ? { ...s, textureUrl: url, name } : s,
         ),
       }));
     } else {
@@ -508,7 +545,9 @@ export default function ControlPanel({
     }
   };
 
-  const handleApplyPreset = (presetKey: "roof" | "hood" | "leftDoor" | "rightDoor") => {
+  const handleApplyPreset = (
+    presetKey: "roof" | "hood" | "leftDoor" | "rightDoor",
+  ) => {
     if (!activeSticker) return;
     const isDoor = presetKey === "leftDoor" || presetKey === "rightDoor";
 
@@ -521,7 +560,7 @@ export default function ControlPanel({
               preset: presetKey,
               mirrored: isDoor ? s.mirrored : false,
             }
-          : s
+          : s,
       ),
     }));
   };
@@ -531,7 +570,7 @@ export default function ControlPanel({
     setConfig((prev) => ({
       ...prev,
       stickers: (prev.stickers || []).map((s) =>
-        s.id === activeSticker.id ? { ...s, ...partial } : s
+        s.id === activeSticker.id ? { ...s, ...partial } : s,
       ),
     }));
   };
@@ -545,19 +584,9 @@ export default function ControlPanel({
     }));
   };
 
-  const handleDeleteActiveSticker = () => {
-    if (!activeSticker) return;
-    setConfig((prev) => {
-      const next = (prev.stickers || []).filter((s) => s.id !== activeSticker.id);
-      return {
-        ...prev,
-        stickers: next,
-        activeStickerId: next[0]?.id || null,
-      };
-    });
-  };
-
-  const handleCustomStickerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomStickerUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -597,9 +626,15 @@ export default function ControlPanel({
 
           // Save to persistent custom gallery in localStorage
           setCustomGallery((prev) => {
-            const updated = [galleryItem, ...prev.filter((p) => p.name !== cleanName)];
+            const updated = [
+              galleryItem,
+              ...prev.filter((p) => p.name !== cleanName),
+            ];
             try {
-              localStorage.setItem("customly_custom_stickers_gallery", JSON.stringify(updated));
+              localStorage.setItem(
+                "customly_custom_stickers_gallery",
+                JSON.stringify(updated),
+              );
             } catch {
               // ignore quota
             }
@@ -607,7 +642,11 @@ export default function ControlPanel({
           });
 
           // Add as active sticker on vehicle
-          handleAddNewSticker({ id: galleryItem.id, url: compressedDataUrl, name: cleanName });
+          handleAddNewSticker({
+            id: galleryItem.id,
+            url: compressedDataUrl,
+            name: cleanName,
+          });
         }
       };
       img.src = rawData;
@@ -728,7 +767,9 @@ export default function ControlPanel({
               <span
                 className="text-[10px] font-semibold uppercase tracking-[0.16em]"
                 style={{
-                  color: isDark ? "rgba(210,226,234,0.7)" : "rgba(11,20,24,0.65)",
+                  color: isDark
+                    ? "rgba(210,226,234,0.7)"
+                    : "rgba(11,20,24,0.65)",
                 }}
               >
                 Window Tint
@@ -737,8 +778,8 @@ export default function ControlPanel({
                 {(config.windowTint || "clear") === "limo"
                   ? "Limo Dark (5%)"
                   : (config.windowTint || "clear") === "smoke"
-                  ? "Smoke (35%)"
-                  : "Factory Clear"}
+                    ? "Smoke (35%)"
+                    : "Factory Clear"}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
@@ -765,8 +806,12 @@ export default function ControlPanel({
                         : "border-border-glass glass glass-hover text-text-sub"
                     }`}
                   >
-                    <span className="text-[10px] font-medium leading-tight">{tint.label}</span>
-                    <span className="text-[8px] opacity-60 font-mono mt-0.5">{tint.sub}</span>
+                    <span className="text-[10px] font-medium leading-tight">
+                      {tint.label}
+                    </span>
+                    <span className="text-[8px] opacity-60 font-mono mt-0.5">
+                      {tint.sub}
+                    </span>
                   </button>
                 );
               })}
@@ -779,7 +824,9 @@ export default function ControlPanel({
               <span
                 className="text-[10px] font-semibold uppercase tracking-[0.16em]"
                 style={{
-                  color: isDark ? "rgba(210,226,234,0.7)" : "rgba(11,20,24,0.65)",
+                  color: isDark
+                    ? "rgba(210,226,234,0.7)"
+                    : "rgba(11,20,24,0.65)",
                 }}
               >
                 Headlight Tint
@@ -788,8 +835,8 @@ export default function ControlPanel({
                 {(config.headlightTint || "clear") === "smoke"
                   ? "Smoked Lens"
                   : (config.headlightTint || "clear") === "yellow"
-                  ? "GT3 Yellow"
-                  : "Factory Clear"}
+                    ? "GT3 Yellow"
+                    : "Factory Clear"}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
@@ -815,8 +862,12 @@ export default function ControlPanel({
                         : "border-border-glass glass glass-hover text-text-sub"
                     }`}
                   >
-                    <span className="text-[10px] font-medium leading-tight">{hl.label}</span>
-                    <span className="text-[8px] opacity-60 font-mono mt-0.5">{hl.sub}</span>
+                    <span className="text-[10px] font-medium leading-tight">
+                      {hl.label}
+                    </span>
+                    <span className="text-[8px] opacity-60 font-mono mt-0.5">
+                      {hl.sub}
+                    </span>
                   </button>
                 );
               })}
@@ -864,28 +915,45 @@ export default function ControlPanel({
 
           {/* Curated Stickers Grid */}
           <div className="grid grid-cols-4 gap-2">
-            {DEFAULT_STICKERS.map((st) => (
-              <button
-                key={st.id}
-                onClick={() => handleSelectSticker(st.id, st.url, st.name)}
-                className={`p-1.5 rounded-[4px] border flex flex-col items-center gap-1 transition-all ${
-                  activeSticker?.textureUrl === st.url
-                    ? "border-brand bg-brand/10 ring-1 ring-brand"
-                    : "border-border-glass glass glass-hover"
-                }`}
-                title={st.name}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={st.url}
-                  alt={st.name}
-                  className="w-10 h-10 object-contain drop-shadow"
-                />
-                <span className="text-[10px] text-text-sub truncate w-full text-center">
-                  {st.name.split(" ")[0]}
-                </span>
-              </button>
-            ))}
+            {[...DEFAULT_STICKERS, ...customGallery].map((st) => {
+              const isCustom = !DEFAULT_STICKERS.some((d) => d.id === st.id);
+              return (
+                <div key={st.id} className="relative group">
+                  <button
+                    onClick={() => handleSelectSticker(st.id, st.url, st.name)}
+                    className={`w-full p-1.5 rounded-sm border flex flex-col items-center gap-1 transition-all ${
+                      activeSticker?.textureUrl === st.url
+                        ? "border-brand bg-brand/10 ring-1 ring-brand"
+                        : "border-border-glass glass glass-hover"
+                    }`}
+                    title={st.name}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={st.url}
+                      alt={st.name}
+                      className="w-10 h-10 object-contain drop-shadow"
+                    />
+                    <span className="text-[10px] text-text-sub truncate w-full text-center">
+                      {st.name.split(" ")[0]}
+                    </span>
+                  </button>
+                  {isCustom && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveCustomStickerFromGallery(st.id);
+                      }}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500/80 hover:bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer shadow-sm"
+                      title="Remove from custom gallery"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Button to add another decal to car */}
@@ -919,18 +987,20 @@ export default function ControlPanel({
                       st.preset === "roof"
                         ? "Roof"
                         : st.preset === "hood"
-                        ? "Hood"
-                        : st.preset === "rightDoor"
-                        ? "R-Door"
-                        : st.preset === "leftDoor"
-                        ? "L-Door"
-                        : "Custom";
+                          ? "Hood"
+                          : st.preset === "rightDoor"
+                            ? "R-Door"
+                            : st.preset === "leftDoor"
+                              ? "L-Door"
+                              : "Custom";
                     const isSelected = st.id === activeSticker?.id;
                     return (
                       <div
                         key={st.id}
-                        onClick={() => setConfig((p) => ({ ...p, activeStickerId: st.id }))}
-                        className={`group relative p-1.5 rounded-[4px] border flex flex-col items-center justify-between cursor-pointer transition-all ${
+                        onClick={() =>
+                          setConfig((p) => ({ ...p, activeStickerId: st.id }))
+                        }
+                        className={`group relative p-1.5 rounded-sm border flex flex-col items-center justify-between cursor-pointer transition-all ${
                           isSelected
                             ? "bg-brand/20 border-brand ring-1 ring-brand text-white shadow-sm"
                             : "glass glass-hover border-border-glass text-text-sub"
@@ -977,7 +1047,7 @@ export default function ControlPanel({
               </div>
 
               {/* Collapsible Placement Presets */}
-              <div className="border border-(--glass-border) rounded-[4px] overflow-hidden bg-black/10">
+              <div className="border border-(--glass-border) rounded-sm overflow-hidden bg-black/10">
                 <button
                   type="button"
                   onClick={() => setShowPlacementPresets((prev) => !prev)}
@@ -1089,9 +1159,14 @@ export default function ControlPanel({
                 max={60}
                 step={1}
                 onChange={(val) => {
-                  const ratio = activeSticker.scale[1] / activeSticker.scale[0] || 1;
+                  const ratio =
+                    activeSticker.scale[1] / activeSticker.scale[0] || 1;
                   updateActiveSticker({
-                    scale: [val, Math.round(val * ratio), activeSticker.scale[2]],
+                    scale: [
+                      val,
+                      Math.round(val * ratio),
+                      activeSticker.scale[2],
+                    ],
                   });
                 }}
               />
@@ -1106,7 +1181,11 @@ export default function ControlPanel({
                 onChange={(val) => {
                   const rad = (val * Math.PI) / 180;
                   updateActiveSticker({
-                    rotation: [activeSticker.rotation[0], activeSticker.rotation[1], rad],
+                    rotation: [
+                      activeSticker.rotation[0],
+                      activeSticker.rotation[1],
+                      rad,
+                    ],
                   });
                 }}
               />
