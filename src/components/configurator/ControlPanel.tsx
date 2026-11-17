@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../ui/ThemeProvider";
 import { useSafari } from "@/hooks/useSafari";
+import { trackStudioEvent } from "@/lib/telemetry";
 
 // ─── Car color palette ────────────────────────────────────────────────────────
 const BODY_COLORS = [
@@ -74,7 +75,7 @@ function Folder({
   const isDark = theme === "dark";
 
   return (
-    <div className="mb-3 border-b border-(--glass-border) pb-3 last:border-b-0">
+    <div className="mb-3 border-b border-glass-border pb-3 last:border-b-0">
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-3 py-1.5 text-left group"
@@ -353,13 +354,13 @@ function ViewModeToggle({
   const isDark = theme === "dark";
 
   return (
-    <div className="grid grid-cols-2 border-t border-(--glass-border)">
+    <div className="grid grid-cols-2 border-t border-glass-border">
       {(["exterior", "interior"] as const).map((mode) => {
         const active = viewMode === mode;
         return (
           <button
             key={mode}
-            onClick={() => onChange(mode)}
+            onClick={() => { onChange(mode); trackStudioEvent("VIEW_MODE_TOGGLED", { viewMode: mode, angle: mode === "interior" ? "Cockpit / Interior View" : "3/4 Front Beauty View (45°)" }); }}
             className={`flex items-center justify-center gap-2 py-3.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] transition-all duration-200 ${
               active
                 ? "text-text-main"
@@ -519,6 +520,7 @@ export default function ControlPanel({
       mirrored: false,
     };
 
+    trackStudioEvent("DECAL_APPLIED", { location: newSticker.preset ? "Door Panel" : "Front Hood Center" });
     setConfig((prev) => ({
       ...prev,
       stickers: [...(prev.stickers || []), newSticker],
@@ -747,7 +749,7 @@ export default function ControlPanel({
             metallic={true}
             isGroupActive={!config.mattePaint}
             onSelect={(hex) =>
-              setConfig((p) => ({ ...p, mainColor: hex, mattePaint: false }))
+              setConfig((p) => { trackStudioEvent("PAINT_CHANGED", { hex, matte: false, finish: "High-Gloss Mirror Finish" }); return { ...p, mainColor: hex, mattePaint: false }; })
             }
           />
           <ColorSwatchRow
@@ -757,12 +759,12 @@ export default function ControlPanel({
             metallic={false}
             isGroupActive={Boolean(config.mattePaint)}
             onSelect={(hex) =>
-              setConfig((p) => ({ ...p, mainColor: hex, mattePaint: true }))
+              setConfig((p) => { trackStudioEvent("PAINT_CHANGED", { hex, matte: true, finish: "Satin Matte Clearcoat" }); return { ...p, mainColor: hex, mattePaint: true }; })
             }
           />
 
           {/* Window Tint / Tinted Glass */}
-          <div className="pt-2.5 border-t border-(--glass-border)">
+          <div className="pt-2.5 border-t border-glass-border">
             <div className="flex items-center justify-between mb-2">
               <span
                 className="text-[10px] font-semibold uppercase tracking-[0.16em]"
@@ -819,7 +821,7 @@ export default function ControlPanel({
           </div>
 
           {/* Headlight Tint / Lens Treatment */}
-          <div className="pt-2.5 border-t border-(--glass-border)">
+          <div className="pt-2.5 border-t border-glass-border">
             <div className="flex items-center justify-between mb-2">
               <span
                 className="text-[10px] font-semibold uppercase tracking-[0.16em]"
@@ -887,7 +889,7 @@ export default function ControlPanel({
           swatches={WHEEL_COLORS}
           current={config.accentColor}
           metallic={true}
-          onSelect={(hex) => setConfig((p) => ({ ...p, accentColor: hex }))}
+          onSelect={(hex) => setConfig((p) => { trackStudioEvent("WHEELS_CHANGED", { hex, wheelDesign: "Forged Aero Turbine" }); return { ...p, accentColor: hex }; })}
         />
       </Folder>
 
@@ -1047,7 +1049,7 @@ export default function ControlPanel({
               </div>
 
               {/* Collapsible Placement Presets */}
-              <div className="border border-(--glass-border) rounded-sm overflow-hidden bg-black/10">
+              <div className="border border-glass-border rounded-sm overflow-hidden bg-black/10">
                 <button
                   type="button"
                   onClick={() => setShowPlacementPresets((prev) => !prev)}
@@ -1076,7 +1078,7 @@ export default function ControlPanel({
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="p-2 pt-0 border-t border-(--glass-border)/50"
+                      className="p-2 pt-0 border-t border-glass-border/50"
                     >
                       <div className="grid grid-cols-2 gap-1.5 pt-2">
                         <button
@@ -1261,7 +1263,7 @@ export default function ControlPanel({
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="px-4 py-2 glass rounded-[3px] flex items-center gap-2 whitespace-nowrap border border-(--glass-border) shadow-xl"
+          className="px-4 py-2 glass rounded-[3px] flex items-center gap-2 whitespace-nowrap border border-glass-border shadow-xl"
         >
           <div
             className="w-1.5 h-1.5 rounded-full animate-pulse"
@@ -1277,7 +1279,7 @@ export default function ControlPanel({
       <div className="glass rounded-t-sm rounded-b-none sm:rounded-sm p-0 shadow-2xl flex flex-col sm:max-h-[calc(100dvh-120px)] overflow-hidden will-change-transform">
         {/* Header */}
         <div
-          className="px-5 py-3.5 border-b border-(--glass-border) flex items-center justify-between cursor-pointer group"
+          className="px-5 py-3.5 border-b border-glass-border flex items-center justify-between cursor-pointer group"
           onClick={() => setIsCollapsed(!isCollapsed)}
         >
           <div>
@@ -1302,7 +1304,7 @@ export default function ControlPanel({
             </div>
             <button
               type="button"
-              className="p-1.5 rounded-xs border border-(--glass-border) hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-xs border border-glass-border hover:bg-white/10 transition-colors"
             >
               {isSafari ? (
                 <ChevronUp
@@ -1348,7 +1350,7 @@ export default function ControlPanel({
         {/* Ceer-style Total Summary + Exterior/Interior Tab Footer */}
         {!isCollapsed && (
           <div
-            className="border-t border-(--glass-border)"
+            className="border-t border-glass-border"
             style={{
               background: isDark
                 ? "rgba(8, 16, 21, 0.55)"
@@ -1381,7 +1383,7 @@ export default function ControlPanel({
                   <span>Specs & Order</span>
                 </button>
               ) : (
-                <span className="px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] border border-(--glass-border) rounded-xs text-text-main">
+                <span className="px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] border border-glass-border rounded-xs text-text-main">
                   {activeModel.year} Spec
                 </span>
               )}

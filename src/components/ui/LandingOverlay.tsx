@@ -98,7 +98,7 @@ export default function LandingOverlay({ onEnter }: LandingOverlayProps) {
               {["Audi R8", "Audi RS6", "Audi RS8", "Porsche 911", "Corvette C8"].map((name, i) => (
                 <div
                   key={name}
-                  className="glass rounded-xl px-3 py-2 flex flex-col items-center gap-1 border border-(--glass-border)"
+                  className="glass rounded-xl px-3 py-2 flex flex-col items-center gap-1 border border-glass-border"
                 >
                   <span className="text-[8px] sm:text-[10px] font-bold text-brand-primary uppercase tracking-widest">{name}</span>
                   <div className="w-1.5 h-1.5 rounded-full"
@@ -111,7 +111,7 @@ export default function LandingOverlay({ onEnter }: LandingOverlayProps) {
             <button
               id="enter-configurator-btn"
               onClick={onEnter}
-              className={`group relative w-full sm:w-auto flex justify-center px-6 py-4 sm:px-10 sm:py-5 glass rounded-full items-center gap-3 sm:gap-4 border-2 border-(--glass-border) hover:border-brand-primary/50 duration-500 overflow-hidden landscape-optimized-landing-btn ${
+              className={`group relative w-full sm:w-auto flex justify-center px-6 py-4 sm:px-10 sm:py-5 glass rounded-full items-center gap-3 sm:gap-4 border-2 border-glass-border hover:border-brand-primary/50 duration-500 overflow-hidden landscape-optimized-landing-btn ${
                 isSafari ? "transition-colors" : "transition-all"
               }`}
             >

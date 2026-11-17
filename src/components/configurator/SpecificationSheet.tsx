@@ -26,6 +26,7 @@ import {
   Palette,
 } from "lucide-react";
 import { ConfigState, MODELS, DecalConfig } from "./Model";
+import { recordCommissionLead, trackStudioEvent } from "@/lib/telemetry";
 
 export interface MultiAngleSnapshots {
   front: string;
@@ -82,7 +83,12 @@ export default function SpecificationSheet({
 
   // Capture snapshots asynchronously whenever the spec sheet is opened
   useEffect(() => {
-    if (!isOpen || !getSnapshots) return;
+    if (!isOpen) return;
+    trackStudioEvent("SPEC_SHEET_OPENED", {
+      model: modelInfo.name,
+      basePrice: modelInfo.price,
+    });
+    if (!getSnapshots) return;
 
     let isMounted = true;
     getSnapshots()
@@ -101,7 +107,7 @@ export default function SpecificationSheet({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, getSnapshots]);
+  }, [isOpen, getSnapshots, modelInfo.name, modelInfo.price]);
 
   const hasMounted = useSyncExternalStore(
     emptySubscribe,
@@ -159,6 +165,35 @@ export default function SpecificationSheet({
       setOrderId(generatedId);
       setIsSubmitting(false);
       setOrderSubmitted(true);
+
+      recordCommissionLead({
+        id: generatedId,
+        clientName: customerName.trim() || "Anonymous Collector",
+        email: customerEmail.trim() || "client@bespoke.com",
+        phone: customerPhone.trim() || "+1 (555) 000-0000",
+        location: deliveryCity.trim() || "Zurich, Switzerland",
+        vehicleModel: modelInfo.name,
+        exteriorFinish: config.mattePaint ? "Satin Matte Clearcoat" : "High-Gloss Mirror Finish",
+        exteriorColor: config.mainColor,
+        wheelDesign: "Forged Alloy Wheels",
+        wheelColor: config.accentColor,
+        glassTint: config.tintedWindows ? "Limousine 5%" : "Clear Crystal Factory",
+        caliperColor: "Ceramic Red",
+        activeDecals: (config.stickers || []).map((_, idx) => `Decal #${idx + 1}`),
+        basePrice,
+        optionsTotal: customizationOnlyPrice,
+        totalPrice,
+        depositStatus: "Deposited ($5,000)",
+        paymentMethod: paymentMethod === "card" ? "Credit Card" : paymentMethod === "wire" ? "Bank Wire" : "Crypto (USDC)",
+        submittedAt: "Just now",
+      });
+
+      trackStudioEvent("COMMISSION_SUBMITTED", {
+        orderId: generatedId,
+        model: modelInfo.name,
+        totalPrice,
+        paymentMethod,
+      });
     }, 1200);
   };
 
@@ -280,7 +315,7 @@ export default function SpecificationSheet({
                       : "border-white/10 hover:border-white/30 bg-[#091016]/80"
                   }`}
                 >
-                  <div className="aspect-[16/10] w-full relative flex items-center justify-center bg-[#070b0e] overflow-hidden">
+                  <div className="aspect-16/10 w-full relative flex items-center justify-center bg-[#070b0e] overflow-hidden">
                     {snapUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img

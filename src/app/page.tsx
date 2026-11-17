@@ -8,8 +8,10 @@ import SpecificationSheet, { MultiAngleSnapshots } from "@/components/configurat
 import LandingOverlay from "@/components/ui/LandingOverlay";
 import Loader from "@/components/ui/Loader";
 import { ConfigState, MODELS } from "@/components/configurator/Model";
-import { Sparkles, Share2 } from "lucide-react";
+import { Sparkles, Share2, LayoutDashboard } from "lucide-react";
+import Link from "next/link";
 import { useSafari } from "@/hooks/useSafari";
+import { trackStudioEvent } from "@/lib/telemetry";
 
 const LOCAL_STORAGE_CONFIG_KEY = "customly_saved_car_config";
 
@@ -81,6 +83,18 @@ export default function Home() {
     };
   });
 
+  const selectedModelId = config.selectedModel;
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768;
+    const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
+    trackStudioEvent("STUDIO_ENTER", {
+      device: isMobile ? "Mobile" : isTablet ? "Tablet" : "Desktop",
+      screenWidth: window.innerWidth,
+      screenHeight: window.innerHeight,
+      modelId: selectedModelId,
+    });
+  }, [selectedModelId]);
+
   // Restore saved car model & configuration on subsequent visits (or apply ?config=... if shared)
   useEffect(() => {
     try {
@@ -146,13 +160,18 @@ export default function Home() {
   }, [config]);
 
   const selectedModelInfo = useMemo(
-    () => MODELS.find((m) => m.id === config.selectedModel) || MODELS[0],
-    [config.selectedModel],
+    () => MODELS.find((m) => m.id === selectedModelId) || MODELS[0],
+    [selectedModelId],
   );
 
   // When changing models, keep current colors but update accent default if not set
   const handleModelChange = (modelId: string) => {
     const model = MODELS.find((m) => m.id === modelId) || MODELS[0];
+    trackStudioEvent("MODEL_SELECTED", {
+      modelId,
+      modelName: model.name,
+      basePrice: model.price,
+    });
     setConfig((prev) => ({
       ...prev,
       selectedModel: modelId,
@@ -259,7 +278,7 @@ export default function Home() {
         </div>
 
         {/* Header */}
-        <header className="sticky lg:absolute top-0 left-0 w-full px-4 py-3 lg:px-8 lg:py-4 flex justify-between items-center z-50 pointer-events-none backdrop-blur-md bg-(--bg-dark)/60 border-b border-(--glass-border) landscape-optimized-header">
+        <header className="sticky lg:absolute top-0 left-0 w-full px-4 py-3 lg:px-8 lg:py-4 flex justify-between items-center z-50 pointer-events-none backdrop-blur-md bg-bg-dark/60 border-b border-glass-border landscape-optimized-header">
           <motion.div
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -281,6 +300,13 @@ export default function Home() {
             transition={{ delay: 0.2 }}
             className="flex gap-2 lg:gap-3 pointer-events-auto items-center"
           >
+            <Link
+              href="/admin/dashboard"
+              className="p-2 lg:p-2.5 glass rounded-[3px] glass-hover relative pointer-events-auto flex items-center justify-center text-text-main hover:text-[#d16b54] transition-colors"
+              title="Intelligence Dashboard"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+            </Link>
             <button
               id="share-config-btn"
               onClick={handleShare}
@@ -364,7 +390,7 @@ export default function Home() {
                   {selectedModelInfo.name}
                 </h2>
 
-                <div className="pt-3 border-t border-(--glass-border) flex items-baseline justify-between">
+                <div className="pt-3 border-t border-glass-border flex items-baseline justify-between">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-text-muted">
                     Total Base Price
                   </span>
@@ -414,7 +440,7 @@ export default function Home() {
               className="fixed bottom-5 left-[50%] -translate-x-1/2 flex flex-col items-center gap-1.5 pointer-events-none z-100 landscape-optimized-selection-hint"
             >
               <div className="hidden lg:block lg:scale-100 origin-bottom landscape-optimized-interaction-hint">
-                <div className="px-4 py-1.5 glass rounded-[3px] flex items-center gap-2.5 whitespace-nowrap shadow-xl border border-(--glass-border)">
+                <div className="px-4 py-1.5 glass rounded-[3px] flex items-center gap-2.5 whitespace-nowrap shadow-xl border border-glass-border">
                   <div
                     className="w-1.5 h-1.5 rounded-full"
                     style={{ backgroundColor: "var(--brand-secondary)" }}

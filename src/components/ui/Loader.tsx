@@ -24,7 +24,12 @@ export default function Loader({ progress = 0 }: { progress?: number }) {
           />
           {/* Center logo */}
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-brand-primary font-normal text-lg" style={{ fontFamily: "'Drason', sans-serif" }}>C</span>
+            <span
+              className="text-brand-primary font-normal text-lg"
+              style={{ fontFamily: "'Drason', sans-serif" }}
+            >
+              C
+            </span>
           </div>
         </div>
 
@@ -40,7 +45,7 @@ export default function Loader({ progress = 0 }: { progress?: number }) {
           >
             customly-U
           </h2>
-          <div className="mt-4 w-48 h-1 bg-(--glass-border) rounded-full overflow-hidden">
+          <div className="mt-4 w-48 h-1 bg-glass-border rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
