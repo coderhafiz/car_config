@@ -153,7 +153,7 @@ export default function CustomisationPreferencesPage() {
                     backdropFilter: "blur(20px)",
                   }}
                   formatter={(val: unknown) => [
-                    `${val}% share`,
+                    `${String(val)}% share`,
                     "Selection Share",
                   ]}
                 />
@@ -231,7 +231,7 @@ export default function CustomisationPreferencesPage() {
                     backdropFilter: "blur(20px)",
                   }}
                   formatter={(val: unknown) => [
-                    `${val}% share`,
+                    `${String(val)}% share`,
                     "Selection Share",
                   ]}
                 />

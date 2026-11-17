@@ -304,7 +304,7 @@ export default function AdminDashboardPage() {
                   formatter={(value: unknown, name: unknown) => [
                     name === "pipelineValue"
                       ? `$${Number(value).toLocaleString()}`
-                      : value,
+                      : String(value ?? ""),
                     name === "pipelineValue"
                       ? "Pipeline Value"
                       : "Studio Sessions",
@@ -371,7 +371,7 @@ export default function AdminDashboardPage() {
                     fontSize: "12px",
                     backdropFilter: "blur(20px)",
                   }}
-                  formatter={(val: unknown) => [`${val} selections`, "Count"]}
+                  formatter={(val: unknown) => [`${String(val)} selections`, "Count"]}
                 />
               </PieChart>
             </ResponsiveContainer>
