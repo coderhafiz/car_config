@@ -91,7 +91,7 @@ export function AdminSidebar() {
       icon: Sparkles,
       label: "AI Insights",
       href: "/admin/insights",
-      badge: "Free Tier",
+      badge: null,
     },
   ];
 

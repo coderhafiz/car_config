@@ -43,6 +43,8 @@ export default function AdminAcquisitionPage() {
   const [copied, setCopied] = useState(false);
 
   // Link Builder State
+  const PRODUCTION_DOMAIN = "https://carconfig-gray.vercel.app";
+  const [builderBaseDomain, setBuilderBaseDomain] = useState(PRODUCTION_DOMAIN);
   const [builderSource, setBuilderSource] = useState("instagram");
   const [builderMedium, setBuilderMedium] = useState("paid_social");
   const [builderCampaign, setBuilderCampaign] = useState("porsche_911_launch");
@@ -89,13 +91,13 @@ export default function AdminAcquisitionPage() {
 
   // Generate tracked campaign URL
   const generatedUrl = (() => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://customly-u.luxury";
+    const base = builderBaseDomain.replace(/\/$/, "");
     const params = new URLSearchParams();
     if (builderSource) params.set("utm_source", builderSource);
     if (builderMedium) params.set("utm_medium", builderMedium);
     if (builderCampaign) params.set("utm_campaign", builderCampaign);
     if (builderContent) params.set("utm_content", builderContent);
-    return `${origin}/?${params.toString()}`;
+    return `${base}/?${params.toString()}`;
   })();
 
   const handleCopyLink = () => {
@@ -473,7 +475,21 @@ export default function AdminAcquisitionPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-white/70 mb-1.5">
+              Target Website Domain
+            </label>
+            <select
+              value={builderBaseDomain}
+              onChange={(e) => setBuilderBaseDomain(e.target.value)}
+              className="w-full glass border border-glass-border text-xs text-white rounded-xl px-3 py-2.5 outline-none focus:border-[#026dfe] bg-[#0c161f]"
+            >
+              <option value="https://carconfig-gray.vercel.app">Production (carconfig-gray.vercel.app)</option>
+              <option value="http://localhost:3000">Local Dev (localhost:3000)</option>
+            </select>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-white/70 mb-1.5">
               Traffic Source (utm_source)
