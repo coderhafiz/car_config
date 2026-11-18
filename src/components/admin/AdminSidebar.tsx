@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Megaphone,
   Sliders,
   Activity,
   Car,
@@ -55,6 +56,12 @@ export function AdminSidebar() {
       label: "Overview",
       href: "/admin/dashboard",
       badge: null,
+    },
+    {
+      icon: Megaphone,
+      label: "Acquisition",
+      href: "/admin/acquisition",
+      badge: "UTM",
     },
     {
       icon: Sliders,

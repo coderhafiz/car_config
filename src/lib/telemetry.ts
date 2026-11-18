@@ -20,12 +20,104 @@ export interface TelemetryEvent {
   timestamp: string;
 }
 
+export interface UTMParameters {
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
+  referrer?: string;
+}
+
 const EVENTS_STORAGE_KEY = "customly_analytics_events";
 const LEADS_STORAGE_KEY = "customly_commission_leads";
+const UTM_STORAGE_KEY = "customly_utm_params";
+
+/**
+ * Parses and stores UTM tracking parameters from URL query string or document referrer.
+ */
+export function captureUTMParams(): UTMParameters {
+  if (typeof window === "undefined") return { utm_source: "direct", utm_medium: "direct", utm_campaign: "direct" };
+
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const utm_source = urlParams.get("utm_source") || undefined;
+    const utm_medium = urlParams.get("utm_medium") || undefined;
+    const utm_campaign = urlParams.get("utm_campaign") || undefined;
+    const utm_term = urlParams.get("utm_term") || undefined;
+    const utm_content = urlParams.get("utm_content") || undefined;
+
+    let referrerHostname: string | undefined = undefined;
+    if (document.referrer) {
+      try {
+        referrerHostname = new URL(document.referrer).hostname;
+      } catch {
+        // ignore malformed referrer
+      }
+    }
+
+    // Explicit UTM parameters take top precedence
+    if (utm_source || utm_campaign) {
+      const captured: UTMParameters = {
+        utm_source: utm_source || "unknown",
+        utm_medium: utm_medium || (utm_source === "google" ? "cpc" : "social_ad"),
+        utm_campaign: utm_campaign || "campaign_general",
+        utm_term,
+        utm_content,
+        referrer: referrerHostname,
+      };
+      sessionStorage.setItem(UTM_STORAGE_KEY, JSON.stringify(captured));
+      localStorage.setItem(UTM_STORAGE_KEY, JSON.stringify(captured));
+      return captured;
+    }
+
+    // Check existing stored session
+    const stored = sessionStorage.getItem(UTM_STORAGE_KEY) || localStorage.getItem(UTM_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+
+    // Infer from organic referrer if external
+    if (referrerHostname && !referrerHostname.includes(window.location.hostname)) {
+      const isSearch = referrerHostname.includes("google") || referrerHostname.includes("bing") || referrerHostname.includes("yahoo");
+      const isSocial = referrerHostname.includes("instagram") || referrerHostname.includes("t.co") || referrerHostname.includes("twitter") || referrerHostname.includes("facebook") || referrerHostname.includes("tiktok") || referrerHostname.includes("youtube");
+
+      const inferred: UTMParameters = {
+        utm_source: referrerHostname.replace("www.", ""),
+        utm_medium: isSearch ? "organic_search" : isSocial ? "organic_social" : "referral",
+        utm_campaign: "organic_referral",
+        referrer: referrerHostname,
+      };
+      sessionStorage.setItem(UTM_STORAGE_KEY, JSON.stringify(inferred));
+      return inferred;
+    }
+
+    const direct: UTMParameters = {
+      utm_source: "direct",
+      utm_medium: "none",
+      utm_campaign: "direct_studio",
+    };
+    sessionStorage.setItem(UTM_STORAGE_KEY, JSON.stringify(direct));
+    return direct;
+  } catch {
+    return { utm_source: "direct", utm_medium: "none", utm_campaign: "direct_studio" };
+  }
+}
+
+export function getStoredUTMParams(): UTMParameters {
+  if (typeof window === "undefined") return { utm_source: "direct", utm_medium: "none", utm_campaign: "direct_studio" };
+  try {
+    const stored = sessionStorage.getItem(UTM_STORAGE_KEY) || localStorage.getItem(UTM_STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+    return captureUTMParams();
+  } catch {
+    return { utm_source: "direct", utm_medium: "none", utm_campaign: "direct_studio" };
+  }
+}
 
 /**
  * Non-blocking event tracker for 3D configurator telemetry.
- * Automatically saves to localStorage and Supabase.
+ * Automatically saves to localStorage and Supabase, injecting UTM context.
  */
 export function trackStudioEvent(
   eventName: TelemetryEvent["eventName"],
@@ -34,10 +126,19 @@ export function trackStudioEvent(
   if (typeof window === "undefined") return;
 
   try {
+    const utm = getStoredUTMParams();
+
+    const mergedMetadata: Record<string, unknown> = {
+      ...(metadata || {}),
+      utm_source: utm.utm_source,
+      utm_medium: utm.utm_medium,
+      utm_campaign: utm.utm_campaign,
+    };
+
     const event: TelemetryEvent = {
       id: `EVT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       eventName,
-      metadata,
+      metadata: mergedMetadata,
       timestamp: new Date().toISOString(),
     };
 
@@ -72,33 +173,42 @@ export async function recordCommissionLead(lead: VehicleCommissionLead) {
   if (typeof window === "undefined") return;
 
   try {
+    const utm = getStoredUTMParams();
+    const enrichedLead: VehicleCommissionLead = {
+      ...lead,
+      utmSource: lead.utmSource || utm.utm_source,
+      utmMedium: lead.utmMedium || utm.utm_medium,
+      utmCampaign: lead.utmCampaign || utm.utm_campaign,
+      utmContent: lead.utmContent || utm.utm_content,
+    };
+
     // 1. Save locally for instant offline preview
     const stored = localStorage.getItem(LEADS_STORAGE_KEY);
     const leads: VehicleCommissionLead[] = stored ? JSON.parse(stored) : [];
-    leads.unshift(lead);
+    leads.unshift(enrichedLead);
     localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(leads));
 
     // 2. Push to Supabase if configured
     if (supabase) {
       const { error } = await supabase.from("commission_leads").insert({
-        id: lead.id,
-        client_name: lead.clientName,
-        email: lead.email,
-        phone: lead.phone,
-        location: lead.location,
-        vehicle_model: lead.vehicleModel,
-        exterior_finish: lead.exteriorFinish,
-        exterior_color: lead.exteriorColor,
-        wheel_design: lead.wheelDesign,
-        wheel_color: lead.wheelColor,
-        glass_tint: lead.glassTint,
-        caliper_color: lead.caliperColor,
-        active_decals: lead.activeDecals,
-        base_price: lead.basePrice,
-        options_total: lead.optionsTotal,
-        total_price: lead.totalPrice,
-        deposit_status: lead.depositStatus,
-        payment_method: lead.paymentMethod,
+        id: enrichedLead.id,
+        client_name: enrichedLead.clientName,
+        email: enrichedLead.email,
+        phone: enrichedLead.phone,
+        location: enrichedLead.location,
+        vehicle_model: enrichedLead.vehicleModel,
+        exterior_finish: enrichedLead.exteriorFinish,
+        exterior_color: enrichedLead.exteriorColor,
+        wheel_design: enrichedLead.wheelDesign,
+        wheel_color: enrichedLead.wheelColor,
+        glass_tint: enrichedLead.glassTint,
+        caliper_color: enrichedLead.caliperColor,
+        active_decals: enrichedLead.activeDecals,
+        base_price: enrichedLead.basePrice,
+        options_total: enrichedLead.optionsTotal,
+        total_price: enrichedLead.totalPrice,
+        deposit_status: enrichedLead.depositStatus,
+        payment_method: enrichedLead.paymentMethod,
         submitted_at: new Date().toISOString(),
       });
 

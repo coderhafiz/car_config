@@ -69,6 +69,38 @@ export interface RealSavedBuild {
   savedAgo: string;
 }
 
+export interface RealAcquisitionData {
+  totalTrackedVisitors: number;
+  paidTrafficRatio: number;
+  organicTrafficRatio: number;
+  topChannel: string;
+  totalPipelineValue: number;
+  sources: Array<{
+    source: string;
+    medium: string;
+    visitors: number;
+    share: number;
+    color: string;
+  }>;
+  campaigns: Array<{
+    id: string;
+    name: string;
+    source: string;
+    medium: string;
+    visitors: number;
+    builds: number;
+    deposits: number;
+    pipelineValue: number;
+    conversionRate: string;
+  }>;
+  channelConversion: Array<{
+    channel: string;
+    conversionRate: number;
+    avgOrderValue: number;
+    color: string;
+  }>;
+}
+
 const EVENTS_STORAGE_KEY = "customly_analytics_events";
 const LEADS_STORAGE_KEY = "customly_commission_leads";
 const BUILDS_STORAGE_KEY = "customly_saved_builds";
@@ -578,6 +610,10 @@ export async function seedRealTelemetryData(): Promise<{ success: boolean; event
       depositStatus: "Deposited ($5,000)",
       paymentMethod: "Credit Card",
       submittedAt: "10m ago",
+      utmSource: "instagram",
+      utmMedium: "paid_social",
+      utmCampaign: "porsche_911_launch",
+      utmContent: "reel_video_gt3_carbon",
     },
     {
       id: `CMD-${Date.now()}-02`,
@@ -599,6 +635,10 @@ export async function seedRealTelemetryData(): Promise<{ success: boolean; event
       depositStatus: "Deposited ($5,000)",
       paymentMethod: "Bank Wire",
       submittedAt: "25m ago",
+      utmSource: "google",
+      utmMedium: "cpc",
+      utmCampaign: "bespoke_custom_cars",
+      utmContent: "search_headline_custom_rs6",
     },
     {
       id: `CMD-${Date.now()}-03`,
@@ -620,6 +660,10 @@ export async function seedRealTelemetryData(): Promise<{ success: boolean; event
       depositStatus: "Quote Requested",
       paymentMethod: "Crypto (USDC)",
       submittedAt: "1h ago",
+      utmSource: "youtube",
+      utmMedium: "influencer",
+      utmCampaign: "supercar_blondie_review",
+      utmContent: "pinned_link_description",
     },
     {
       id: `CMD-${Date.now()}-04`,
@@ -641,6 +685,10 @@ export async function seedRealTelemetryData(): Promise<{ success: boolean; event
       depositStatus: "Deposited ($5,000)",
       paymentMethod: "Credit Card",
       submittedAt: "2h ago",
+      utmSource: "newsletter",
+      utmMedium: "email",
+      utmCampaign: "concours_elegance_vip",
+      utmContent: "exclusive_preview_cta",
     },
   ];
 
@@ -675,24 +723,25 @@ export async function seedRealTelemetryData(): Promise<{ success: boolean; event
       });
     }
 
-    // Generate real telemetry events
+    // Generate real telemetry events with rich UTM campaign attribution
     const sampleEvents: Array<{
       id: string;
       event_name: string;
       metadata: Record<string, unknown>;
       created_at: string;
     }> = [
-      { id: `EVT-${Date.now()}-1`, event_name: "STUDIO_ENTER", metadata: { device: "Desktop", path: "/" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-2`, event_name: "STUDIO_ENTER", metadata: { device: "Mobile", path: "/" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-3`, event_name: "MODEL_SELECTED", metadata: { modelName: "Porsche 911 992" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-4`, event_name: "MODEL_SELECTED", metadata: { modelName: "Audi RS6 Avant" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-5`, event_name: "PAINT_CHANGED", metadata: { finish: "Satin Matte Clearcoat", hex: "#d2b48c" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-6`, event_name: "PAINT_CHANGED", metadata: { finish: "High-Gloss Mirror Finish", hex: "#0a0a0a" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-7`, event_name: "WHEELS_CHANGED", metadata: { wheelDesign: "Forged Aero Turbine" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-8`, event_name: "VIEW_MODE_TOGGLED", metadata: { angle: "Driver Side Profile (90°)" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-9`, event_name: "VIEW_MODE_TOGGLED", metadata: { angle: "3/4 Front Beauty View (45°)" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-10`, event_name: "SPEC_SHEET_OPENED", metadata: { model: "Porsche 911 992" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-11`, event_name: "COMMISSION_SUBMITTED", metadata: { model: "Porsche 911 992", totalPrice: 155100 }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-1`, event_name: "STUDIO_ENTER", metadata: { device: "Desktop", path: "/", utm_source: "instagram", utm_medium: "social_ad", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-2`, event_name: "STUDIO_ENTER", metadata: { device: "Mobile", path: "/", utm_source: "google", utm_medium: "cpc", utm_campaign: "bespoke_custom_cars" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-3`, event_name: "STUDIO_ENTER", metadata: { device: "Desktop", path: "/", utm_source: "youtube", utm_medium: "influencer", utm_campaign: "supercar_blondie_review" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-4`, event_name: "MODEL_SELECTED", metadata: { modelName: "Porsche 911 992", utm_source: "instagram", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-5`, event_name: "MODEL_SELECTED", metadata: { modelName: "Audi RS6 Avant", utm_source: "google", utm_campaign: "bespoke_custom_cars" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-6`, event_name: "PAINT_CHANGED", metadata: { finish: "Satin Matte Clearcoat", hex: "#d2b48c", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-7`, event_name: "PAINT_CHANGED", metadata: { finish: "High-Gloss Mirror Finish", hex: "#0a0a0a", utm_campaign: "bespoke_custom_cars" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-8`, event_name: "WHEELS_CHANGED", metadata: { wheelDesign: "Forged Aero Turbine", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-9`, event_name: "VIEW_MODE_TOGGLED", metadata: { angle: "Driver Side Profile (90°)", utm_campaign: "supercar_blondie_review" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-10`, event_name: "VIEW_MODE_TOGGLED", metadata: { angle: "3/4 Front Beauty View (45°)", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-11`, event_name: "SPEC_SHEET_OPENED", metadata: { model: "Porsche 911 992", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+      { id: `EVT-${Date.now()}-12`, event_name: "COMMISSION_SUBMITTED", metadata: { model: "Porsche 911 992", totalPrice: 155100, utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
     ];
 
     for (const evt of sampleEvents) {
@@ -799,5 +848,232 @@ export function getActiveViewerSessions(events: TelemetryEvent[]): ActiveViewerS
   }
 
   return sessions;
+}
+
+/**
+ * Computes acquisition & campaign analytics from real telemetry and commission leads.
+ */
+export function computeRealAcquisition(
+  events: TelemetryEvent[],
+  leads: VehicleCommissionLead[]
+): RealAcquisitionData {
+  // Map sessions to UTM data
+  const sessionMap = new Map<
+    string,
+    {
+      source: string;
+      medium: string;
+      campaign: string;
+      events: TelemetryEvent[];
+      lead?: VehicleCommissionLead;
+    }
+  >();
+
+  events.forEach((e) => {
+    const sId =
+      (e.metadata?.sessionId as string) ||
+      e.id.split("-").slice(0, 2).join("-");
+    if (!sessionMap.has(sId)) {
+      const src =
+        (e.metadata?.utm_source as string) ||
+        (e.metadata?.referrer && (e.metadata.referrer as string).includes("google")
+          ? "google"
+          : (e.metadata?.referrer && (e.metadata.referrer as string).includes("instagram")
+          ? "instagram"
+          : (e.metadata?.referrer && (e.metadata.referrer as string).includes("youtube")
+          ? "youtube"
+          : "direct")));
+      const med =
+        (e.metadata?.utm_medium as string) ||
+        (src === "direct" ? "none" : src === "google" ? "organic" : "social");
+      const camp =
+        (e.metadata?.utm_campaign as string) ||
+        (src === "direct" ? "direct_nav" : "general_brand");
+
+      sessionMap.set(sId, {
+        source: src,
+        medium: med,
+        campaign: camp,
+        events: [],
+      });
+    }
+    sessionMap.get(sId)!.events.push(e);
+  });
+
+  // Attach leads to sessions if matching sessionId or fallback by utmSource
+  leads.forEach((l) => {
+    const foundSession = sessionMap.get(l.id);
+    if (foundSession) {
+      foundSession.lead = l;
+      if (l.utmSource) foundSession.source = l.utmSource;
+      if (l.utmMedium) foundSession.medium = l.utmMedium;
+      if (l.utmCampaign) foundSession.campaign = l.utmCampaign;
+    } else {
+      sessionMap.set(`lead-${l.id}`, {
+        source: l.utmSource || "direct",
+        medium: l.utmMedium || (l.utmSource ? "cpc" : "none"),
+        campaign: l.utmCampaign || "bespoke_commission",
+        events: [],
+        lead: l,
+      });
+    }
+  });
+
+  // Aggregators
+  const sourceCounts: Record<string, { medium: string; visitors: number }> = {};
+  const campaignAgg: Record<
+    string,
+    {
+      source: string;
+      medium: string;
+      visitors: number;
+      builds: number;
+      deposits: number;
+      pipelineValue: number;
+    }
+  > = {};
+
+  const channelMap: Record<
+    string,
+    { visitors: number; orders: number; pipeline: number }
+  > = {
+    "Instagram Ads": { visitors: 0, orders: 0, pipeline: 0 },
+    "Google Search": { visitors: 0, orders: 0, pipeline: 0 },
+    "YouTube Influencer": { visitors: 0, orders: 0, pipeline: 0 },
+    "Private Newsletter": { visitors: 0, orders: 0, pipeline: 0 },
+    "Organic / Direct": { visitors: 0, orders: 0, pipeline: 0 },
+  };
+
+  sessionMap.forEach((val) => {
+    const srcKey = val.source.toLowerCase();
+    const medKey = val.medium.toLowerCase();
+    const campKey = val.campaign;
+
+    // Source count
+    if (!sourceCounts[srcKey]) {
+      sourceCounts[srcKey] = { medium: medKey, visitors: 0 };
+    }
+    sourceCounts[srcKey].visitors += 1;
+
+    // Campaign count
+    if (!campaignAgg[campKey]) {
+      campaignAgg[campKey] = {
+        source: val.source,
+        medium: val.medium,
+        visitors: 0,
+        builds: 0,
+        deposits: 0,
+        pipelineValue: 0,
+      };
+    }
+    campaignAgg[campKey].visitors += 1;
+
+    // Builds
+    const hasBuild = val.events.some(
+      (e) =>
+        e.eventName === "SPEC_SHEET_OPENED" ||
+        e.eventName === "COMMISSION_SUBMITTED"
+    );
+    if (hasBuild) campaignAgg[campKey].builds += 1;
+
+    // Deposits / Pipeline
+    if (val.lead) {
+      if (val.lead.depositStatus.includes("Deposited")) {
+        campaignAgg[campKey].deposits += 1;
+      }
+      campaignAgg[campKey].pipelineValue += val.lead.totalPrice || 215000;
+    }
+
+    // Channel map bucket
+    let assignedChannel = "Organic / Direct";
+    if (srcKey.includes("instagram") || srcKey.includes("meta")) {
+      assignedChannel = "Instagram Ads";
+    } else if (srcKey.includes("google")) {
+      assignedChannel = medKey.includes("cpc") ? "Google Search" : "Organic / Direct";
+    } else if (srcKey.includes("youtube")) {
+      assignedChannel = "YouTube Influencer";
+    } else if (srcKey.includes("email") || srcKey.includes("newsletter")) {
+      assignedChannel = "Private Newsletter";
+    }
+
+    if (channelMap[assignedChannel]) {
+      channelMap[assignedChannel].visitors += 1;
+      if (val.lead) {
+        channelMap[assignedChannel].orders += 1;
+        channelMap[assignedChannel].pipeline += val.lead.totalPrice || 215000;
+      }
+    }
+  });
+
+  const totalVisitors = Math.max(sessionMap.size, 1);
+
+  // Palette colors for sources
+  const palette = ["#026dfe", "#d16b54", "#10b981", "#8b5cf6", "#f59e0b", "#06b6d4", "#ec4899"];
+
+  const sources = Object.entries(sourceCounts)
+    .sort((a, b) => b[1].visitors - a[1].visitors)
+    .map(([src, d], idx) => ({
+      source: src.charAt(0).toUpperCase() + src.slice(1),
+      medium: d.medium,
+      visitors: d.visitors,
+      share: Math.round((d.visitors / totalVisitors) * 100),
+      color: palette[idx % palette.length],
+    }));
+
+  const campaigns = Object.entries(campaignAgg)
+    .sort((a, b) => b[1].pipelineValue - a[1].pipelineValue || b[1].visitors - a[1].visitors)
+    .map(([name, d], idx) => {
+      const cr = d.visitors > 0 ? ((d.deposits / d.visitors) * 100).toFixed(1) : "0.0";
+      return {
+        id: `camp-${idx + 1}`,
+        name: name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        source: d.source,
+        medium: d.medium,
+        visitors: d.visitors,
+        builds: d.builds,
+        deposits: d.deposits,
+        pipelineValue: d.pipelineValue,
+        conversionRate: `${cr}%`,
+      };
+    });
+
+  const channelColors: Record<string, string> = {
+    "Instagram Ads": "#ec4899",
+    "Google Search": "#026dfe",
+    "YouTube Influencer": "#ef4444",
+    "Private Newsletter": "#10b981",
+    "Organic / Direct": "#8b5cf6",
+  };
+
+  const channelConversion = Object.entries(channelMap).map(([chan, val]) => {
+    const convRate = val.visitors > 0 ? +((val.orders / val.visitors) * 100).toFixed(1) : 0;
+    const avgOrder = val.orders > 0 ? Math.round(val.pipeline / val.orders) : 0;
+    return {
+      channel: chan,
+      conversionRate: convRate,
+      avgOrderValue: avgOrder,
+      color: channelColors[chan] || "#026dfe",
+    };
+  });
+
+  const paidVisitors = sources
+    .filter((s) => ["cpc", "paid", "social", "influencer", "ads"].includes(s.medium.toLowerCase()))
+    .reduce((sum, s) => sum + s.visitors, 0);
+
+  const paidRatio = Math.round((paidVisitors / totalVisitors) * 100);
+  const organicRatio = 100 - paidRatio;
+  const topChannel = sources[0]?.source || "Direct";
+  const totalPipeline = leads.reduce((sum, l) => sum + (l.totalPrice || 0), 0);
+
+  return {
+    totalTrackedVisitors: totalVisitors,
+    paidTrafficRatio: paidRatio,
+    organicTrafficRatio: organicRatio,
+    topChannel,
+    totalPipelineValue: totalPipeline,
+    sources,
+    campaigns,
+    channelConversion,
+  };
 }
 

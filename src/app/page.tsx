@@ -11,7 +11,7 @@ import { ConfigState, MODELS } from "@/components/configurator/Model";
 import { Sparkles, Share2, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { useSafari } from "@/hooks/useSafari";
-import { trackStudioEvent } from "@/lib/telemetry";
+import { trackStudioEvent, captureUTMParams } from "@/lib/telemetry";
 
 const LOCAL_STORAGE_CONFIG_KEY = "customly_saved_car_config";
 
@@ -85,6 +85,7 @@ export default function Home() {
 
   const selectedModelId = config.selectedModel;
   useEffect(() => {
+    captureUTMParams();
     const isMobile = window.innerWidth < 768;
     const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
     trackStudioEvent("STUDIO_ENTER", {

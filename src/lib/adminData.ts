@@ -18,6 +18,10 @@ export interface VehicleCommissionLead {
   depositStatus: "Deposited ($5,000)" | "Quote Requested" | "In Review" | "In Production";
   paymentMethod: "Credit Card" | "Bank Wire" | "Crypto (USDC)";
   submittedAt: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
 }
 
 export interface FunnelStep {
