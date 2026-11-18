@@ -195,37 +195,6 @@ export function AdminSidebar() {
             );
           })}
         </div>
-
-        {/* Database & Hosting Status Footer */}
-        <div className="p-4 border-t border-glass-border bg-black/30">
-          <div className="rounded-xl p-3 glass border border-glass-border space-y-2">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-[#d2e2ea]/60">Database Engine</span>
-              <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Supabase Free Tier
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-[#d2e2ea]/60">AI Summaries</span>
-              <span className="text-[#d16b54] font-semibold">
-                Gemini Free Tier
-              </span>
-            </div>
-            <div className="w-full bg-white/10 rounded-full h-1 mt-2 overflow-hidden">
-              <div
-                className="bg-linear-to-r from-[#d16b54] to-[#026dfe] h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${Math.max(2, Math.min(100, depositsCount * 2))}%`,
-                }}
-              />
-            </div>
-            <div className="flex justify-between text-[9px] text-[#d2e2ea]/50">
-              <span>Database Storage</span>
-              <span>&lt; 1 MB / 500 MB</span>
-            </div>
-          </div>
-        </div>
       </aside>
     </>
   );
