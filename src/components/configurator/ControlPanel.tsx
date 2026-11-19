@@ -402,6 +402,7 @@ interface ControlPanelProps {
   isCollapsed: boolean;
   setIsCollapsed: (v: boolean) => void;
   onOpenSpecSheet?: () => void;
+  onOpenARStickers?: () => void;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -412,6 +413,7 @@ export default function ControlPanel({
   isCollapsed,
   setIsCollapsed,
   onOpenSpecSheet,
+  onOpenARStickers,
 }: ControlPanelProps) {
   const isSafari = useSafari();
 
@@ -900,6 +902,19 @@ export default function ControlPanel({
         defaultOpen={false}
       >
         <div className="space-y-3 pt-1 pb-2">
+          {/* WebXR AR Real-Car Surface Hit-Test Launcher */}
+          {onOpenARStickers && (
+            <button
+              type="button"
+              onClick={onOpenARStickers}
+              className="w-full py-2.5 px-3 rounded-[3px] bg-linear-to-r from-[#026dfe] to-[#0151c2] hover:brightness-110 text-white text-[11px] font-bold uppercase tracking-wider shadow-lg shadow-[#026dfe]/30 flex items-center justify-center gap-2 transition cursor-pointer"
+              title="Point your phone camera at a real car to conform and apply stickers in AR"
+            >
+              <Crosshair className="w-3.5 h-3.5" />
+              <span>AR Real-Car Sticker Camera (WebXR)</span>
+            </button>
+          )}
+
           {/* Header & Upload Button */}
           <div className="flex items-center justify-between text-xs text-text-sub font-medium">
             <span>Sticker Gallery</span>

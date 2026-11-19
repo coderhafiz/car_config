@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import ConfiguratorCanvas from "@/components/configurator/ConfiguratorCanvas";
 import ControlPanel from "@/components/configurator/ControlPanel";
 import SpecificationSheet, { MultiAngleSnapshots } from "@/components/configurator/SpecificationSheet";
+import ARStickerStudio from "@/components/configurator/ARStickerStudio";
 import LandingOverlay from "@/components/ui/LandingOverlay";
 import Loader from "@/components/ui/Loader";
 import { ConfigState, MODELS } from "@/components/configurator/Model";
-import { Sparkles, Share2, LayoutDashboard } from "lucide-react";
+import { Sparkles, Share2, LayoutDashboard, Scan } from "lucide-react";
 import Link from "next/link";
 import { useSafari } from "@/hooks/useSafari";
 import { trackStudioEvent, captureUTMParams } from "@/lib/telemetry";
@@ -27,6 +28,7 @@ export default function Home() {
   const [shouldEagerLoad, setShouldEagerLoad] = useState(false);
   const [showHint, setShowHint] = useState(true);
   const [showSpecSheet, setShowSpecSheet] = useState(false);
+  const [showARStickers, setShowARStickers] = useState(false);
   const captureRef = useRef<(() => Promise<MultiAngleSnapshots>) | null>(null);
 
   // Auto-dismiss interaction hint after 5 seconds to keep the canvas clean
@@ -309,6 +311,15 @@ export default function Home() {
               <LayoutDashboard className="w-4 h-4" />
             </Link>
             <button
+              id="ar-sticker-btn"
+              onClick={() => setShowARStickers(true)}
+              className="px-2.5 lg:px-3 py-2 glass rounded-[3px] glass-hover relative pointer-events-auto flex items-center gap-1.5 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.14em] text-[#026dfe] border border-[#026dfe]/40 hover:border-[#026dfe] transition-all cursor-pointer"
+              title="Point phone camera at a real car to apply stickers in AR (WebXR Hit-Test)"
+            >
+              <Scan className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">AR Stickers</span>
+            </button>
+            <button
               id="share-config-btn"
               onClick={handleShare}
               className="p-2 lg:p-2.5 glass rounded-[3px] glass-hover relative pointer-events-auto"
@@ -426,6 +437,7 @@ export default function Home() {
               isCollapsed={isCollapsed}
               setIsCollapsed={setIsCollapsed}
               onOpenSpecSheet={() => setShowSpecSheet(true)}
+              onOpenARStickers={() => setShowARStickers(true)}
             />
           )}
         </div>
@@ -470,6 +482,12 @@ export default function Home() {
               ? captureRef.current()
               : Promise.resolve({ front: "", back: "", left: "", right: "" })
           }
+        />
+        {/* WebXR Hit-Test AR Real-Car Sticker Placement Studio */}
+        <ARStickerStudio
+          isOpen={showARStickers}
+          onClose={() => setShowARStickers(false)}
+          initialStickerUrl={config.stickers?.[0]?.textureUrl}
         />
       </motion.div>
     </main>
