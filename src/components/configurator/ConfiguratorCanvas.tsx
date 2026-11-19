@@ -700,7 +700,7 @@ export default function ConfiguratorCanvas({
           powerPreference: "high-performance",
           stencil: false,
           depth: true,
-          preserveDrawingBuffer: true,
+          preserveDrawingBuffer: false,
           toneMapping: THREE.AgXToneMapping,
           toneMappingExposure: 1.25,
         }}

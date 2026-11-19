@@ -4,7 +4,9 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ConfiguratorCanvas from "@/components/configurator/ConfiguratorCanvas";
 import ControlPanel from "@/components/configurator/ControlPanel";
-import SpecificationSheet, { MultiAngleSnapshots } from "@/components/configurator/SpecificationSheet";
+import SpecificationSheet, {
+  MultiAngleSnapshots,
+} from "@/components/configurator/SpecificationSheet";
 import ARStickerStudio from "@/components/configurator/ARStickerStudio";
 import LandingOverlay from "@/components/ui/LandingOverlay";
 import Loader from "@/components/ui/Loader";
@@ -79,8 +81,8 @@ export default function Home() {
       viewMode: "exterior",
       selectedTexture: "leather",
       mattePaint: false,
-      windowTint: 'clear',
-      headlightTint: 'clear',
+      windowTint: "clear",
+      headlightTint: "clear",
       tintedWindows: false,
     };
   });
@@ -135,7 +137,7 @@ export default function Home() {
         ) {
           console.log(
             "[Config] Restoring saved 3D car model from prior visit:",
-            saved.selectedModel
+            saved.selectedModel,
           );
           const timer = setTimeout(() => {
             setConfig((prev) => ({ ...prev, ...saved }));
@@ -148,18 +150,21 @@ export default function Home() {
     }
   }, []);
 
-  // Persist the user's chosen 3D car model and customizations for subsequent visits
+  // Persist the user's chosen 3D car model and customizations for subsequent visits (debounced to keep 60fps on mobile)
   useEffect(() => {
-    try {
-      if (typeof window !== "undefined" && window.localStorage) {
-        window.localStorage.setItem(
-          LOCAL_STORAGE_CONFIG_KEY,
-          JSON.stringify(config)
-        );
+    const timer = setTimeout(() => {
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          window.localStorage.setItem(
+            LOCAL_STORAGE_CONFIG_KEY,
+            JSON.stringify(config),
+          );
+        }
+      } catch {
+        // Ignore quota errors
       }
-    } catch {
-      // Ignore quota errors
-    }
+    }, 400);
+    return () => clearTimeout(timer);
   }, [config]);
 
   const selectedModelInfo = useMemo(
@@ -290,7 +295,9 @@ export default function Home() {
             <div className="flex items-center">
               <h1
                 className="text-[10px] sm:text-base lg:text-xl font-normal tracking-[0.06em] sm:tracking-[0.16em] text-white whitespace-nowrap"
-                style={{ fontFamily: "'Drason', var(--font-open-sans), sans-serif" }}
+                style={{
+                  fontFamily: "'Drason', var(--font-open-sans), sans-serif",
+                }}
               >
                 customly-<span className="text-brand-primary">U</span>
               </h1>
@@ -330,7 +337,7 @@ export default function Home() {
             <button
               id="add-to-cart-btn"
               onClick={() => setShowSpecSheet(true)}
-              className="px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-[3px] text-[8px] sm:text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.1em] sm:tracking-[0.18em] flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition-all duration-200 hover:brightness-110 glass"
+              className="px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-[3px] text-[8px] sm:text-[9px] lg:text-[10px] font-bold uppercase tracking-widest sm:tracking-[0.18em] flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition-all duration-200 hover:brightness-110 glass"
               style={{
                 background:
                   "linear-gradient(135deg, rgba(28, 54, 66, 0.85) 0%, rgba(16, 33, 42, 0.92) 100%)",

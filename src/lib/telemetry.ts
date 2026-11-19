@@ -127,45 +127,48 @@ export function trackStudioEvent(
 ) {
   if (typeof window === "undefined") return;
 
-  try {
-    const utm = getStoredUTMParams();
+  // Defer storage and network I/O off the main interaction frame so 3D touch/orbit stays locked at 60fps on mobile
+  setTimeout(() => {
+    try {
+      const utm = getStoredUTMParams();
 
-    const mergedMetadata: Record<string, unknown> = {
-      ...(metadata || {}),
-      utm_source: utm.utm_source,
-      utm_medium: utm.utm_medium,
-      utm_campaign: utm.utm_campaign,
-    };
+      const mergedMetadata: Record<string, unknown> = {
+        ...(metadata || {}),
+        utm_source: utm.utm_source,
+        utm_medium: utm.utm_medium,
+        utm_campaign: utm.utm_campaign,
+      };
 
-    const event: TelemetryEvent = {
-      id: `EVT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      eventName,
-      metadata: mergedMetadata,
-      timestamp: new Date().toISOString(),
-    };
+      const event: TelemetryEvent = {
+        id: `EVT-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        eventName,
+        metadata: mergedMetadata,
+        timestamp: new Date().toISOString(),
+      };
 
-    // 1. Local Storage queue (keeps last 500 events)
-    const stored = localStorage.getItem(EVENTS_STORAGE_KEY);
-    const events: TelemetryEvent[] = stored ? JSON.parse(stored) : [];
-    events.unshift(event);
-    if (events.length > 500) events.pop();
-    localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
+      // 1. Local Storage queue (keeps last 500 events)
+      const stored = localStorage.getItem(EVENTS_STORAGE_KEY);
+      const events: TelemetryEvent[] = stored ? JSON.parse(stored) : [];
+      events.unshift(event);
+      if (events.length > 500) events.pop();
+      localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
 
-    // 2. Supabase background push (non-blocking)
-    if (supabase) {
-      Promise.resolve(
-        supabase.from("telemetry_events").insert({
-          id: event.id,
-          event_name: event.eventName,
-          metadata: event.metadata,
-          created_at: event.timestamp,
-        })
-      ).catch(() => {});
+      // 2. Supabase background push (non-blocking)
+      if (supabase) {
+        Promise.resolve(
+          supabase.from("telemetry_events").insert({
+            id: event.id,
+            event_name: event.eventName,
+            metadata: event.metadata,
+            created_at: event.timestamp,
+          })
+        ).catch(() => {});
+      }
+    } catch (err) {
+      // Failsafe to protect 3D canvas execution
+      console.debug("[Telemetry] skipped", err);
     }
-  } catch (err) {
-    // Failsafe to protect 3D canvas execution
-    console.debug("[Telemetry] skipped", err);
-  }
+  }, 0);
 }
 
 /**

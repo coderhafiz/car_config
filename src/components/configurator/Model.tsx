@@ -1911,6 +1911,26 @@ interface ProcessedCarScene {
 }
 
 const processedCarSceneCache = new Map<string, ProcessedCarScene>();
+const decalTextureCache = new Map<string, THREE.Texture>();
+import type * as THREE from "three";
+
+function loadCachedDecalTexture(
+  url: string,
+  onLoad: (tex: THREE.Texture) => void,
+) {
+  const cached = decalTextureCache.get(url);
+  if (cached) {
+    onLoad(cached);
+    return;
+  }
+  const loader = new TextureLoader();
+  loader.load(url, (tex) => {
+    tex.colorSpace = SRGBColorSpace;
+    tex.needsUpdate = true;
+    decalTextureCache.set(url, tex);
+    onLoad(tex);
+  });
+}
 
 function DecalItem({
   bodyMesh,
@@ -1943,16 +1963,17 @@ function DecalItem({
     let decalMesh: Mesh | null = null;
     let decalGeom: BufferGeometry | null = null;
 
-    const loader = new TextureLoader();
-    loader.load(decal.textureUrl, (tex) => {
-      if (!active) return;
-      tex.colorSpace = SRGBColorSpace;
-      tex.needsUpdate = true;
+    // Throttle heavy DecalGeometry triangle clipping by 45ms so slider drags don't block mobile frames
+    const timer = setTimeout(() => {
+      loadCachedDecalTexture(decal.textureUrl, (tex) => {
+        if (!active) return;
 
-      try {
-        bodyMesh.geometry.computeBoundingBox();
-        const bBox = bodyMesh.geometry.boundingBox;
-        if (!bBox) return;
+        try {
+          if (!bodyMesh.geometry.boundingBox) {
+            bodyMesh.geometry.computeBoundingBox();
+          }
+          const bBox = bodyMesh.geometry.boundingBox;
+          if (!bBox) return;
 
         const spanX = Math.max(0.1, bBox.max.x - bBox.min.x);
         const spanZ = Math.max(0.1, bBox.max.z - bBox.min.z);
@@ -2087,10 +2108,12 @@ function DecalItem({
       } catch (err) {
         console.warn("Decal generation error:", err);
       }
-    });
+      });
+    }, 45);
 
     return () => {
       active = false;
+      clearTimeout(timer);
       if (decalMesh) {
         bodyMesh.remove(decalMesh);
         if (decalMesh.material) {
@@ -2431,21 +2454,6 @@ export function Model({
               paintSet.add(mat);
               if (!bodyMeshes.includes(child)) {
                 bodyMeshes.push(child);
-                if (
-                  child.geometry &&
-                  !(child.geometry as BufferGeometry & { boundsTree?: unknown })
-                    .boundsTree
-                ) {
-                  try {
-                    (
-                      child.geometry as BufferGeometry & {
-                        computeBoundsTree?: () => void;
-                      }
-                    ).computeBoundsTree?.();
-                  } catch {
-                    // Ignore non-manifold edges
-                  }
-                }
               }
             } else if (cat === "accent") {
               applyMetallicWheelFinish(mat);
@@ -2638,20 +2646,6 @@ export function Model({
 
         if (isPaint || isNamedBody) {
           activeBodyMeshes.push(child);
-          if (
-            !(child.geometry as BufferGeometry & { boundsTree?: unknown })
-              .boundsTree
-          ) {
-            try {
-              (
-                child.geometry as BufferGeometry & {
-                  computeBoundsTree?: () => void;
-                }
-              ).computeBoundsTree?.();
-            } catch {
-              // ignore non-manifold edges
-            }
-          }
         }
       }
     });
@@ -2933,37 +2927,62 @@ export function Model({
     }
   });
 
-  const bodyMeshes = (scene?.userData?.bodyMeshes as Mesh[]) || [];
+  const bodyMeshes = useMemo(
+    () => (scene?.userData?.bodyMeshes as Mesh[]) || [],
+    [scene],
+  );
+
+  // Lazily build BVH bounds tree ONLY when user actually enters stickerPlacementMode
+  useEffect(() => {
+    if (!config.stickerPlacementMode || bodyMeshes.length === 0) return;
+    for (const bm of bodyMeshes) {
+      if (
+        bm.geometry &&
+        !(bm.geometry as BufferGeometry & { boundsTree?: unknown }).boundsTree
+      ) {
+        try {
+          (
+            bm.geometry as BufferGeometry & { computeBoundsTree?: () => void }
+          ).computeBoundsTree?.();
+        } catch {
+          // ignore non-manifold edges
+        }
+      }
+    }
+  }, [config.stickerPlacementMode, bodyMeshes]);
 
   return (
     <group
       ref={wrapperRef}
       scale={0}
-      onPointerDown={(e) => {
-        if (!config.stickerPlacementMode) return;
-        e.stopPropagation();
+      onPointerDown={
+        config.stickerPlacementMode
+          ? (e) => {
+              e.stopPropagation();
 
-        const hit = e.intersections.find((i) =>
-          bodyMeshes.some((bm) => bm === i.object),
-        );
-        if (!hit || !hit.face) return;
+              const hit = e.intersections.find((i) =>
+                bodyMeshes.some((bm) => bm === i.object),
+              );
+              if (!hit || !hit.face) return;
 
-        const targetMesh = hit.object as Mesh;
-        const localPoint = targetMesh.worldToLocal(hit.point.clone());
-        const localNormal = hit.face.normal.clone().normalize();
+              const targetMesh = hit.object as Mesh;
+              const localPoint = targetMesh.worldToLocal(hit.point.clone());
+              const localNormal = hit.face.normal.clone().normalize();
 
-        const dummy = new Object3D();
-        dummy.position.copy(localPoint);
-        dummy.lookAt(localPoint.clone().add(localNormal));
+              const dummy = new Object3D();
+              dummy.position.copy(localPoint);
+              dummy.lookAt(localPoint.clone().add(localNormal));
 
-        if (onPlacementHit) {
-          onPlacementHit(
-            [localPoint.x, localPoint.y, localPoint.z],
-            [dummy.rotation.x, dummy.rotation.y, dummy.rotation.z],
-            targetMesh.name,
-          );
-        }
-      }}
+              if (onPlacementHit) {
+                onPlacementHit(
+                  [localPoint.x, localPoint.y, localPoint.z],
+                  [dummy.rotation.x, dummy.rotation.y, dummy.rotation.z],
+                  targetMesh.name,
+                );
+              }
+            }
+          : undefined
+      }
     >
       <primitive object={scene} dispose={null} />
       {contactShadowMesh && (
