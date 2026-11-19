@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import {
   Megaphone,
   Share2,
@@ -13,8 +12,6 @@ import {
   ExternalLink,
   RefreshCw,
   Sparkles,
-  ArrowUpRight,
-  Filter,
   Download,
 } from "lucide-react";
 import {
@@ -25,8 +22,6 @@ import {
   YAxis,
   Tooltip,
   Cell,
-  PieChart,
-  Pie,
 } from "recharts";
 import { MetricCard } from "@/components/admin/MetricCard";
 import {
@@ -76,8 +71,19 @@ export default function AdminAcquisitionPage() {
   }, []);
 
   useEffect(() => {
-    refreshData();
-  }, [refreshData]);
+    let isMounted = true;
+    Promise.all([fetchAllRealEvents(), fetchAllRealLeads()]).then(
+      ([events, leads]) => {
+        if (isMounted) {
+          setData(computeRealAcquisition(events, leads));
+          setIsLoading(false);
+        }
+      },
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSeed = async () => {
     setIsSeeding(true);
