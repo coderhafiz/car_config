@@ -18,6 +18,11 @@ export interface RealPreferencesData {
   paintFinishes: Array<{ name: string; count: number; share: number; color: string }>;
   wheelChoices: Array<{ name: string; selections: number; share: number; avgOptionPrice: number }>;
   decalPlacements: Array<{ location: string; count: number; share: string }>;
+  arStats?: {
+    sessionsLaunched: number;
+    stickersPlacedInAR: number;
+    snapshotsCaptured: number;
+  };
   topCombinations: Array<{
     combo: string;
     share: string;
@@ -427,19 +432,30 @@ export function computeRealPreferences(
     avgOptionPrice: val.avgPrice,
   }));
 
-  // 3. Decal placements
+  // 3. Decal placements & AR Usage
   const decalCounts: Record<string, number> = {
+    "AR Real-Car Surface (WebXR)": 0,
     "Driver Door Panel": 0,
     "Passenger Door Panel": 0,
     "Front Hood Center": 0,
     "Rear Diffuser / Quarter": 0,
   };
 
+  let arStickersPlaced = 0;
   events.filter((e) => e.eventName === "DECAL_APPLIED").forEach((e) => {
-    const loc = String(e.metadata?.location || "Driver Door Panel");
-    if (decalCounts[loc] !== undefined) decalCounts[loc] += 1;
-    else decalCounts["Driver Door Panel"] += 1;
+    const isAR = e.metadata?.mode === "WebXR_AR_HitTest" || String(e.metadata?.location || "").includes("AR");
+    if (isAR) {
+      decalCounts["AR Real-Car Surface (WebXR)"] += 1;
+      arStickersPlaced += 1;
+    } else {
+      const loc = String(e.metadata?.location || "Driver Door Panel");
+      if (decalCounts[loc] !== undefined) decalCounts[loc] += 1;
+      else decalCounts["Driver Door Panel"] += 1;
+    }
   });
+
+  const arSessionsLaunched = events.filter((e) => e.eventName === "AR_SESSION_STARTED").length;
+  const arSnapshotsCaptured = events.filter((e) => e.eventName === "AR_SNAPSHOT_CAPTURED").length;
 
   const totalDecals = Object.values(decalCounts).reduce((a, b) => a + b, 0) || 1;
   const decalPlacements = Object.entries(decalCounts).map(([location, count]) => ({
@@ -477,6 +493,11 @@ export function computeRealPreferences(
     paintFinishes,
     wheelChoices,
     decalPlacements,
+    arStats: {
+      sessionsLaunched: arSessionsLaunched,
+      stickersPlacedInAR: arStickersPlaced,
+      snapshotsCaptured: arSnapshotsCaptured,
+    },
     topCombinations,
   };
 }
@@ -526,8 +547,9 @@ export function computeRealFunnel(events: TelemetryEvent[]): RealFunnelData {
     },
   ];
 
-  // Camera angles
+  // Camera angles & AR Camera views
   const angleCounts: Record<string, number> = {
+    "AR Real-Car Camera (WebXR)": 0,
     "Driver Side Profile (90°)": 0,
     "3/4 Front Beauty View (45°)": 0,
     "Cockpit / Interior View": 0,
@@ -535,18 +557,22 @@ export function computeRealFunnel(events: TelemetryEvent[]): RealFunnelData {
     "Front Fascia & Grille (0°)": 0,
   };
 
-  events.filter((e) => e.eventName === "VIEW_MODE_TOGGLED").forEach((e) => {
-    const angle = String(e.metadata?.angle || e.metadata?.viewMode || "");
-    if (angle.includes("interior") || angle.includes("Cockpit")) {
-      angleCounts["Cockpit / Interior View"] += 1;
-    } else if (angle.includes("Side") || angle.includes("90")) {
-      angleCounts["Driver Side Profile (90°)"] += 1;
-    } else if (angle.includes("Rear") || angle.includes("180")) {
-      angleCounts["Rear Fascia & Diffuser (180°)"] += 1;
-    } else if (angle.includes("Front") || angle.includes("0")) {
-      angleCounts["Front Fascia & Grille (0°)"] += 1;
-    } else {
-      angleCounts["3/4 Front Beauty View (45°)"] += 1;
+  events.forEach((e) => {
+    if (e.eventName === "AR_SESSION_STARTED" || (e.eventName === "DECAL_APPLIED" && e.metadata?.mode === "WebXR_AR_HitTest")) {
+      angleCounts["AR Real-Car Camera (WebXR)"] += 1;
+    } else if (e.eventName === "VIEW_MODE_TOGGLED") {
+      const angle = String(e.metadata?.angle || e.metadata?.viewMode || "");
+      if (angle.includes("interior") || angle.includes("Cockpit")) {
+        angleCounts["Cockpit / Interior View"] += 1;
+      } else if (angle.includes("Side") || angle.includes("90")) {
+        angleCounts["Driver Side Profile (90°)"] += 1;
+      } else if (angle.includes("Rear") || angle.includes("180")) {
+        angleCounts["Rear Fascia & Diffuser (180°)"] += 1;
+      } else if (angle.includes("Front") || angle.includes("0")) {
+        angleCounts["Front Fascia & Grille (0°)"] += 1;
+      } else {
+        angleCounts["3/4 Front Beauty View (45°)"] += 1;
+      }
     }
   });
 
@@ -722,44 +748,49 @@ export async function seedRealTelemetryData(): Promise<{ success: boolean; event
         submitted_at: new Date().toISOString(),
       });
     }
+  }
 
-    // Generate real telemetry events with rich UTM campaign attribution
-    const sampleEvents: Array<{
-      id: string;
-      event_name: string;
-      metadata: Record<string, unknown>;
-      created_at: string;
-    }> = [
-      { id: `EVT-${Date.now()}-1`, event_name: "STUDIO_ENTER", metadata: { device: "Desktop", path: "/", utm_source: "instagram", utm_medium: "social_ad", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-2`, event_name: "STUDIO_ENTER", metadata: { device: "Mobile", path: "/", utm_source: "google", utm_medium: "cpc", utm_campaign: "bespoke_custom_cars" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-3`, event_name: "STUDIO_ENTER", metadata: { device: "Desktop", path: "/", utm_source: "youtube", utm_medium: "influencer", utm_campaign: "supercar_blondie_review" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-4`, event_name: "MODEL_SELECTED", metadata: { modelName: "Porsche 911 992", utm_source: "instagram", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-5`, event_name: "MODEL_SELECTED", metadata: { modelName: "Audi RS6 Avant", utm_source: "google", utm_campaign: "bespoke_custom_cars" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-6`, event_name: "PAINT_CHANGED", metadata: { finish: "Satin Matte Clearcoat", hex: "#d2b48c", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-7`, event_name: "PAINT_CHANGED", metadata: { finish: "High-Gloss Mirror Finish", hex: "#0a0a0a", utm_campaign: "bespoke_custom_cars" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-8`, event_name: "WHEELS_CHANGED", metadata: { wheelDesign: "Forged Aero Turbine", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-9`, event_name: "VIEW_MODE_TOGGLED", metadata: { angle: "Driver Side Profile (90°)", utm_campaign: "supercar_blondie_review" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-10`, event_name: "VIEW_MODE_TOGGLED", metadata: { angle: "3/4 Front Beauty View (45°)", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-11`, event_name: "SPEC_SHEET_OPENED", metadata: { model: "Porsche 911 992", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
-      { id: `EVT-${Date.now()}-12`, event_name: "COMMISSION_SUBMITTED", metadata: { model: "Porsche 911 992", totalPrice: 155100, utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
-    ];
+  // Generate real telemetry events with rich UTM campaign attribution & WebXR AR telemetry
+  const sampleEvents: Array<{
+    id: string;
+    event_name: string;
+    metadata: Record<string, unknown>;
+    created_at: string;
+  }> = [
+    { id: `EVT-${Date.now()}-1`, event_name: "STUDIO_ENTER", metadata: { device: "Desktop", path: "/", utm_source: "instagram", utm_medium: "social_ad", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-2`, event_name: "STUDIO_ENTER", metadata: { device: "Mobile", path: "/", utm_source: "google", utm_medium: "cpc", utm_campaign: "bespoke_custom_cars" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-3`, event_name: "STUDIO_ENTER", metadata: { device: "Desktop", path: "/", utm_source: "youtube", utm_medium: "influencer", utm_campaign: "supercar_blondie_review" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-4`, event_name: "MODEL_SELECTED", metadata: { modelName: "Porsche 911 992", utm_source: "instagram", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-5`, event_name: "MODEL_SELECTED", metadata: { modelName: "Audi RS6 Avant", utm_source: "google", utm_campaign: "bespoke_custom_cars" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-6`, event_name: "PAINT_CHANGED", metadata: { finish: "Satin Matte Clearcoat", hex: "#d2b48c", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-7`, event_name: "PAINT_CHANGED", metadata: { finish: "High-Gloss Mirror Finish", hex: "#0a0a0a", utm_campaign: "bespoke_custom_cars" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-8`, event_name: "WHEELS_CHANGED", metadata: { wheelDesign: "Forged Aero Turbine", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-9`, event_name: "VIEW_MODE_TOGGLED", metadata: { angle: "Driver Side Profile (90°)", utm_campaign: "supercar_blondie_review" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-10`, event_name: "VIEW_MODE_TOGGLED", metadata: { angle: "3/4 Front Beauty View (45°)", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-11`, event_name: "AR_SESSION_STARTED", metadata: { arMode: "WebXR Hit-Test", angle: "AR Real-Car Camera (WebXR)", device: "Mobile", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-12`, event_name: "DECAL_APPLIED", metadata: { mode: "WebXR_AR_HitTest", location: "AR Real-Car Surface (WebXR)", stickerName: "Apex GT Crest", panelPreset: "door", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-13`, event_name: "AR_SNAPSHOT_CAPTURED", metadata: { placedStickersCount: 2, arMode: "webxr", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-14`, event_name: "SPEC_SHEET_OPENED", metadata: { model: "Porsche 911 992", utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+    { id: `EVT-${Date.now()}-15`, event_name: "COMMISSION_SUBMITTED", metadata: { model: "Porsche 911 992", totalPrice: 155100, utm_campaign: "porsche_911_launch" }, created_at: new Date().toISOString() },
+  ];
 
+  if (supabase) {
     for (const evt of sampleEvents) {
       await supabase.from("telemetry_events").upsert(evt);
     }
-
-    if (typeof window !== "undefined") {
-      const localSampleEvents = sampleEvents.map((s) => ({
-        id: s.id,
-        eventName: s.event_name as TelemetryEvent["eventName"],
-        metadata: s.metadata,
-        timestamp: s.created_at,
-      }));
-      localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(localSampleEvents));
-    }
   }
 
-  return { success: true, eventsCreated: 11, leadsCreated: testLeads.length };
+  if (typeof window !== "undefined") {
+    const localSampleEvents = sampleEvents.map((s) => ({
+      id: s.id,
+      eventName: s.event_name as TelemetryEvent["eventName"],
+      metadata: s.metadata,
+      timestamp: s.created_at,
+    }));
+    localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(localSampleEvents));
+  }
+
+  return { success: true, eventsCreated: sampleEvents.length, leadsCreated: testLeads.length };
 }
 
 /**
@@ -819,6 +850,9 @@ export function getActiveViewerSessions(events: TelemetryEvent[]): ActiveViewerS
       MODEL_SELECTED: "Exploring Car Models",
       PAINT_CHANGED: "Customizing Paint & Finish",
       WHEELS_CHANGED: "Selecting Wheels & Accents",
+      DECAL_APPLIED: "Applying Stickers & Decals",
+      AR_SESSION_STARTED: "Launched WebXR AR Sticker Camera",
+      AR_SNAPSHOT_CAPTURED: "Captured AR Car Sticker Photo",
       VIEW_MODE_TOGGLED: "Inspecting 3D Angles",
       SPEC_SHEET_OPENED: "Reviewing Specification Sheet",
       COMMISSION_SUBMITTED: "Submitted Bespoke Order",

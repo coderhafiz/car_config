@@ -501,6 +501,7 @@ export default function ARStickerStudio({
 
     trackStudioEvent("DECAL_APPLIED", {
       mode: "WebXR_AR_HitTest",
+      location: "AR Real-Car Surface (WebXR)",
       stickerName: sticker.name,
       sizeCm,
       panelPreset: latestParamsRef.current.panelPreset,
@@ -595,6 +596,10 @@ export default function ARStickerStudio({
       }
       ctx.drawImage(renderer.domElement, 0, 0);
       setSnapshotUrl(outCanvas.toDataURL("image/png"));
+      trackStudioEvent("AR_SNAPSHOT_CAPTURED", {
+        placedStickersCount: placedStickersRef.current.length,
+        arMode,
+      });
     }
 
     if (reticle) reticle.visible = true;
@@ -760,6 +765,11 @@ export default function ARStickerStudio({
           setStatusMessage(
             "WebXR Hit-Test Active: Aim at car panel to scan surface curvature"
           );
+          trackStudioEvent("AR_SESSION_STARTED", {
+            arMode: "WebXR Hit-Test",
+            angle: "AR Real-Car Camera (WebXR)",
+            device: window.innerWidth < 768 ? "Mobile" : "Desktop",
+          });
 
           await renderer.xr.setSession(session as unknown as never);
 
@@ -971,6 +981,11 @@ export default function ARStickerStudio({
       setStatusMessage(
         "Live Camera AR Active: Tap or drag on car body to conform & stamp sticker"
       );
+      trackStudioEvent("AR_SESSION_STARTED", {
+        arMode: "Live Camera AR",
+        angle: "AR Real-Car Camera (WebXR)",
+        device: window.innerWidth < 768 ? "Mobile" : "Desktop",
+      });
 
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {

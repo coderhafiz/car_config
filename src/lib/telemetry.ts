@@ -12,6 +12,8 @@ export interface TelemetryEvent {
     | "WHEELS_CHANGED"
     | "GLASS_TINT_CHANGED"
     | "DECAL_APPLIED"
+    | "AR_SESSION_STARTED"
+    | "AR_SNAPSHOT_CAPTURED"
     | "VIEW_MODE_TOGGLED"
     | "SPEC_SHEET_OPENED"
     | "COMMISSION_SUBMITTED";

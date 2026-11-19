@@ -274,11 +274,39 @@ export default function CustomisationPreferencesPage() {
             </div>
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-white">
-                Sticker Locations
+                Sticker Locations & AR
               </h2>
               <p className="text-xs text-[#d2e2ea]/50 mt-0.5">
-                Where users position graphics on the car.
+                3D body placements & WebXR real-car AR usage.
               </p>
+            </div>
+          </div>
+
+          {/* WebXR AR Telemetry Summary */}
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="p-2.5 rounded-xl bg-[#026dfe]/10 border border-[#026dfe]/25 text-center">
+              <div className="text-sm font-black text-white tabular-nums">
+                {preferences.arStats?.sessionsLaunched ?? 0}
+              </div>
+              <div className="text-[9px] uppercase tracking-wider text-[#026dfe] font-bold mt-0.5">
+                AR Launches
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-center">
+              <div className="text-sm font-black text-white tabular-nums">
+                {preferences.arStats?.stickersPlacedInAR ?? 0}
+              </div>
+              <div className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold mt-0.5">
+                AR Stickers
+              </div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#d16b54]/10 border border-[#d16b54]/25 text-center">
+              <div className="text-sm font-black text-white tabular-nums">
+                {preferences.arStats?.snapshotsCaptured ?? 0}
+              </div>
+              <div className="text-[9px] uppercase tracking-wider text-[#d16b54] font-bold mt-0.5">
+                AR Photos
+              </div>
             </div>
           </div>
 
