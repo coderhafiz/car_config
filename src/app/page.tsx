@@ -281,15 +281,15 @@ export default function Home() {
         </div>
 
         {/* Header */}
-        <header className="sticky lg:absolute top-0 left-0 w-full px-4 py-3 lg:px-8 lg:py-4 flex justify-between items-center z-50 pointer-events-none backdrop-blur-md bg-bg-dark/60 border-b border-glass-border landscape-optimized-header">
+        <header className="sticky lg:absolute top-0 left-0 w-full px-2.5 sm:px-4 py-2.5 sm:py-3 lg:px-8 lg:py-4 flex justify-between items-center gap-2 z-50 pointer-events-none backdrop-blur-md bg-bg-dark/60 border-b border-glass-border landscape-optimized-header">
           <motion.div
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="pointer-events-auto"
+            className="pointer-events-auto shrink-0"
           >
             <div className="flex items-center">
               <h1
-                className="text-sm sm:text-base lg:text-xl font-normal tracking-[0.12em] sm:tracking-[0.16em] text-white"
+                className="text-[10px] sm:text-base lg:text-xl font-normal tracking-[0.06em] sm:tracking-[0.16em] text-white whitespace-nowrap"
                 style={{ fontFamily: "'Drason', var(--font-open-sans), sans-serif" }}
               >
                 customly-<span className="text-brand-primary">U</span>
@@ -301,36 +301,36 @@ export default function Home() {
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="flex gap-2 lg:gap-3 pointer-events-auto items-center"
+            className="flex gap-1.5 sm:gap-2 lg:gap-3 pointer-events-auto items-center shrink-0"
           >
             <Link
               href="/admin/dashboard"
-              className="p-2 lg:p-2.5 glass rounded-[3px] glass-hover relative pointer-events-auto flex items-center justify-center text-text-main hover:text-[#d16b54] transition-colors"
+              className="p-1.5 sm:p-2 lg:p-2.5 glass rounded-[3px] glass-hover relative pointer-events-auto flex items-center justify-center text-text-main hover:text-[#d16b54] transition-colors"
               title="Intelligence Dashboard"
             >
-              <LayoutDashboard className="w-4 h-4" />
+              <LayoutDashboard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Link>
             <button
               id="ar-sticker-btn"
               onClick={() => setShowARStickers(true)}
-              className="px-2.5 lg:px-3 py-2 glass rounded-[3px] glass-hover relative pointer-events-auto flex items-center gap-1.5 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.14em] text-[#026dfe] border border-[#026dfe]/40 hover:border-[#026dfe] transition-all cursor-pointer"
+              className="p-1.5 sm:px-2.5 lg:px-3 sm:py-2 glass rounded-[3px] glass-hover relative pointer-events-auto flex items-center justify-center gap-1.5 text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.14em] text-[#026dfe] border border-[#026dfe]/40 hover:border-[#026dfe] transition-all cursor-pointer"
               title="Point phone camera at a real car to apply stickers in AR (WebXR Hit-Test)"
             >
-              <Scan className="w-3.5 h-3.5" />
+              <Scan className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">AR Stickers</span>
             </button>
             <button
               id="share-config-btn"
               onClick={handleShare}
-              className="p-2 lg:p-2.5 glass rounded-[3px] glass-hover relative pointer-events-auto"
+              className="p-1.5 sm:p-2 lg:p-2.5 glass rounded-[3px] glass-hover relative pointer-events-auto"
               title="Share configuration"
             >
-              <Share2 className="w-4 h-4 text-text-main" />
+              <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-text-main" />
             </button>
             <button
               id="add-to-cart-btn"
               onClick={() => setShowSpecSheet(true)}
-              className="px-3 lg:px-4 py-2 rounded-[3px] text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.18em] flex items-center gap-2 whitespace-nowrap transition-all duration-200 hover:brightness-110 glass"
+              className="px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 rounded-[3px] text-[8px] sm:text-[9px] lg:text-[10px] font-bold uppercase tracking-[0.1em] sm:tracking-[0.18em] flex items-center gap-1.5 sm:gap-2 whitespace-nowrap transition-all duration-200 hover:brightness-110 glass"
               style={{
                 background:
                   "linear-gradient(135deg, rgba(28, 54, 66, 0.85) 0%, rgba(16, 33, 42, 0.92) 100%)",
@@ -343,7 +343,7 @@ export default function Home() {
             >
               <span>Commission Build</span>
               <Sparkles
-                className="w-3.5 h-3.5 shrink-0"
+                className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0"
                 style={{ color: "var(--brand-secondary)" }}
               />
             </button>
