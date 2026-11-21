@@ -778,9 +778,31 @@ export default function ARStickerStudio({
 
           let hitTestSource: XRHitTestSource | null = null;
           if (session.requestHitTestSource) {
-            hitTestSource = await session.requestHitTestSource({
-              space: viewerSpace,
-            });
+            try {
+              const XRRayCtor = (
+                window as unknown as {
+                  XRRay?: new (
+                    origin: { x: number; y: number; z: number; w?: number },
+                    direction: { x: number; y: number; z: number; w?: number }
+                  ) => unknown;
+                }
+              ).XRRay;
+              // Angle the hit-test ray slightly upward (+0.16 Y) so it targets the visual center of the open mobile camera view above the bottom HUD
+              const offsetRay = XRRayCtor
+                ? new XRRayCtor(
+                    { x: 0, y: 0, z: 0, w: 1 },
+                    { x: 0, y: 0.16, z: -1, w: 0 }
+                  )
+                : undefined;
+              hitTestSource = await session.requestHitTestSource({
+                space: viewerSpace,
+                ...(offsetRay ? { offsetRay } : {}),
+              });
+            } catch {
+              hitTestSource = await session.requestHitTestSource({
+                space: viewerSpace,
+              });
+            }
           }
 
           let transientHitTestSource: XRTransientInputHitTestSource | null =
@@ -801,6 +823,9 @@ export default function ARStickerStudio({
           const hitQuat = new THREE.Quaternion();
           const hitScale = new THREE.Vector3();
           const hitNormal = new THREE.Vector3();
+          const viewerMatrix = new THREE.Matrix4();
+          const viewerMatrixInv = new THREE.Matrix4();
+          const posInViewer = new THREE.Vector3();
           // WebXR hit-test pose has +Y as the surface normal; rotate +90deg around X so +Z faces out from car panel
           const alignYToZ = new THREE.Quaternion().setFromAxisAngle(
             new THREE.Vector3(1, 0, 0),
@@ -812,6 +837,7 @@ export default function ARStickerStudio({
           renderer.setAnimationLoop((_timestamp, xrFrame) => {
             const frame = xrFrame as unknown as XRFrameExtended | undefined;
             if (frame && hitTestSource) {
+              const viewerPose = frame.getViewerPose(localSpace);
               const hitResults = frame.getHitTestResults(hitTestSource);
               if (hitResults.length > 0) {
                 const pose = hitResults[0].getPose(localSpace);
@@ -825,6 +851,19 @@ export default function ARStickerStudio({
                     .set(0, 0, 1)
                     .applyQuaternion(hitQuat)
                     .normalize();
+
+                  // Keep the targeting ring centered in the middle/upper open mobile viewport (prevent dropping to the bottom floor plane)
+                  if (viewerPose) {
+                    viewerMatrix.fromArray(viewerPose.transform.matrix);
+                    viewerMatrixInv.copy(viewerMatrix).invert();
+                    posInViewer.copy(hitPos).applyMatrix4(viewerMatrixInv);
+                    const dist = Math.max(0.6, Math.abs(posInViewer.z));
+                    const minAllowedY = 0.08 * dist;
+                    if (posInViewer.y < minAllowedY) {
+                      posInViewer.y = 0.14 * dist;
+                      hitPos.copy(posInViewer).applyMatrix4(viewerMatrix);
+                    }
+                  }
 
                   reticleGroup.visible = true;
                   reticleGroup.position.copy(hitPos);
@@ -879,7 +918,6 @@ export default function ARStickerStudio({
 
                   // Optional Depth-Sensing API curvature estimation
                   let depthCurvature = { cx: 0, cy: 0 };
-                  const viewerPose = frame.getViewerPose(localSpace);
                   if (
                     frame.getDepthInformation &&
                     viewerPose &&
@@ -1025,11 +1063,11 @@ export default function ARStickerStudio({
         proxyCarPanelGeom,
         new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
       );
-      proxyCarPanel.position.set(0, 0, -1.25);
+      proxyCarPanel.position.set(0, 0.16, -1.25);
       scene.add(proxyCarPanel);
 
-      // Default initial hit pose at center of car body proxy
-      const defaultPos = new THREE.Vector3(0, 0, -1.25);
+      // Default initial hit pose positioned in the visual middle of the mobile screen (above the bottom controls)
+      const defaultPos = new THREE.Vector3(0, 0.16, -1.25);
       const defaultQuat = new THREE.Quaternion();
       const defaultNormal = new THREE.Vector3(0, 0, 1);
 
@@ -1043,12 +1081,15 @@ export default function ARStickerStudio({
       };
 
       const raycaster = new THREE.Raycaster();
-      const pointerNDC = new THREE.Vector2(0, 0);
+      const pointerNDC = new THREE.Vector2(0, 0.16);
 
       const updateFallbackHitTest = (clientX: number, clientY: number) => {
+        // Ignore touches in the bottom HUD control drawer area so the circle never drops into the lower screen
+        if (clientY > window.innerHeight - 210 || clientY < 75) return;
         const rect = renderer.domElement.getBoundingClientRect();
         pointerNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-        pointerNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        const rawY = -((clientY - rect.top) / rect.height) * 2 + 1;
+        pointerNDC.y = THREE.MathUtils.clamp(rawY, -0.08, 0.65);
 
         raycaster.setFromCamera(pointerNDC, camera);
         const hits = raycaster.intersectObject(proxyCarPanel, false);
@@ -1165,52 +1206,53 @@ export default function ARStickerStudio({
         ref={overlayRef}
         className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-5 z-10"
       >
-        {/* Top Bar: Mode Status & Exit */}
-        <div className="flex items-center justify-between gap-2 pointer-events-auto">
-          <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl glass border border-glass-border backdrop-blur-xl bg-[#06090b]/80 shadow-xl">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-white">
-                  AR Surface Decal Studio
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#026dfe]/20 border border-[#026dfe]/50 text-[#026dfe] font-bold uppercase">
-                  {arMode === "webxr" ? "WebXR Hit-Test" : "Live Camera AR"}
-                </span>
+        {/* Top Bar + Guidance Pill stacked at the top so the middle of the screen is 100% clear for the blue AR circle */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 pointer-events-auto">
+            <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl glass border border-glass-border backdrop-blur-xl bg-[#06090b]/80 shadow-xl">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-white">
+                    AR Surface Decal Studio
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#026dfe]/20 border border-[#026dfe]/50 text-[#026dfe] font-bold uppercase">
+                    {arMode === "webxr" ? "WebXR Hit-Test" : "Live Camera AR"}
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#d2e2ea]/70 mt-0.5 max-w-xs sm:max-w-md truncate">
+                  {statusMessage}
+                </p>
               </div>
-              <p className="text-[10px] text-[#d2e2ea]/70 mt-0.5 max-w-xs sm:max-w-md truncate">
-                {statusMessage}
-              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCaptureSnapshot}
+                className="p-2.5 rounded-xl glass border border-glass-border bg-[#06090b]/80 text-white/90 hover:text-white transition shadow-lg cursor-pointer"
+                title="Take AR Photo Snapshot"
+              >
+                <Camera className="w-4 h-4 text-[#026dfe]" />
+              </button>
+
+              <button
+                onClick={onClose}
+                className="p-2.5 rounded-xl glass border border-red-500/40 bg-red-950/50 text-red-300 hover:bg-red-600 hover:text-white transition shadow-lg cursor-pointer"
+                title="Exit AR Studio"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleCaptureSnapshot}
-              className="p-2.5 rounded-xl glass border border-glass-border bg-[#06090b]/80 text-white/90 hover:text-white transition shadow-lg cursor-pointer"
-              title="Take AR Photo Snapshot"
-            >
-              <Camera className="w-4 h-4 text-[#026dfe]" />
-            </button>
-
-            <button
-              onClick={onClose}
-              className="p-2.5 rounded-xl glass border border-red-500/40 bg-red-950/50 text-red-300 hover:bg-red-600 hover:text-white transition shadow-lg cursor-pointer"
-              title="Exit AR Studio"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Center Reticle Guidance Pill */}
-        <div className="self-center pointer-events-none">
-          <div className="px-3.5 py-1.5 rounded-full bg-black/55 backdrop-blur-md border border-white/10 text-[11px] text-white/85 flex items-center gap-2 shadow-lg">
-            <Crosshair className="w-3.5 h-3.5 text-[#026dfe]" />
-            <span>
-              Aim blue ring at car door, hood, or fender · Surface curvature
-              auto-conforms
-            </span>
+          <div className="flex justify-center pointer-events-none">
+            <div className="px-3.5 py-1 rounded-full bg-black/55 backdrop-blur-md border border-white/10 text-[10px] text-white/85 flex items-center gap-2 shadow-lg">
+              <Crosshair className="w-3 h-3 text-[#026dfe]" />
+              <span>
+                Aim blue ring at car door, hood, or fender · Curvature
+                auto-conforms
+              </span>
+            </div>
           </div>
         </div>
 
