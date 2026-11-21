@@ -9,6 +9,8 @@ import {
   Palette,
   FileText,
   Cpu,
+  ShieldCheck,
+  Gauge,
   Layers,
 } from "lucide-react";
 
@@ -132,7 +134,7 @@ export default function Loader({
       </div>
 
       {/* Top Navbar (Clean without "Bespoke") */}
-      <header className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-8 pt-4 sm:pt-6 flex items-center justify-between gap-3">
+      <header className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-8 pt-4 sm:pt-6 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span
             className="text-sm sm:text-xl font-normal tracking-[0.16em] text-white"
@@ -151,70 +153,145 @@ export default function Loader({
         </div>
       </header>
 
-      {/* Main Content: Editorial Headline, Introduction & 4 Feature Cards */}
-      <div className="relative z-10 w-full max-w-4xl mx-auto px-4 sm:px-8 py-6 my-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex flex-col items-center text-center space-y-5 sm:space-y-6"
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#d16b54]/10 border border-[#d16b54]/30 text-[#d16b54] text-[10px] font-bold uppercase tracking-[0.22em]">
-            <Sparkles className="w-3 h-3" />
-            <span>Real-Time WebGL2 & WebXR Configurator</span>
-          </div>
+      {/* Main Split Hero Content: Editorial Headline + 4 Feature Cards + Hero Image */}
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-8 py-4 sm:py-6 my-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+          {/* Left Column: Editorial Headline, Introduction & 4 Feature Cards (6 cols) */}
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="lg:col-span-6 space-y-4 sm:space-y-5"
+          >
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#d16b54]/10 border border-[#d16b54]/30 text-[#d16b54] text-[10px] font-bold uppercase tracking-[0.22em]">
+              <Sparkles className="w-3 h-3" />
+              <span>Real-Time WebGL2 & WebXR Configurator</span>
+            </div>
 
-          <h1 className="text-2xl sm:text-4xl xl:text-5xl font-extrabold tracking-tight leading-[1.12] text-white">
-            Sculpted in Light.{" "}
-            <span className="bg-linear-to-r from-[#edf2f4] via-[#9cc6e8] to-[#d16b54] bg-clip-text text-transparent">
-              Engineered to Your Spec.
-            </span>
-          </h1>
+            <h1 className="text-2xl sm:text-4xl xl:text-5xl font-extrabold tracking-tight leading-[1.12] text-white">
+              Sculpted in Light.{" "}
+              <span className="bg-linear-to-r from-[#edf2f4] via-[#9cc6e8] to-[#d16b54] bg-clip-text text-transparent">
+                Engineered to Your Spec.
+              </span>
+            </h1>
 
-          <p className="text-xs sm:text-sm text-[#d2e2ea]/70 leading-relaxed max-w-2xl">
-            Welcome to <strong className="text-white font-semibold">Customly-U</strong>. Explore our
-            curated fleet of flagship supercars in an interactive 3D architectural studio. Tailor
-            multi-stage metallic and satin-matte finishes, cabin leathers, forged aero wheels,
-            and project custom racing decals onto curved bodywork in 3D or directly onto real cars via{" "}
-            <span className="text-[#026dfe] font-semibold">WebXR Augmented Reality</span>.
-          </p>
+            <p className="text-xs sm:text-sm text-[#d2e2ea]/70 leading-relaxed max-w-xl">
+              Welcome to <strong className="text-white font-semibold">Customly-U</strong>. Explore our
+              curated fleet of flagship supercars in an interactive 3D architectural studio. Tailor
+              multi-stage metallic and satin-matte finishes, cabin leathers, forged aero wheels,
+              and project custom racing decals onto curved bodywork in 3D or directly onto real cars via{" "}
+              <span className="text-[#026dfe] font-semibold">WebXR Augmented Reality</span>.
+            </p>
 
-          {/* 4 Feature Cards */}
-          <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-left">
-            {PLATFORM_FEATURES.map((feat) => {
-              const Icon = feat.icon;
-              return (
-                <div
-                  key={feat.title}
-                  className="p-3.5 sm:p-4 rounded-xl glass border border-glass-border bg-white/2 hover:bg-white/4 transition flex items-start gap-3"
-                >
+            {/* 4 Key Website Capabilities Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {PLATFORM_FEATURES.map((feat) => {
+                const Icon = feat.icon;
+                return (
                   <div
-                    className="p-2 rounded-lg shrink-0 mt-0.5"
-                    style={{
-                      backgroundColor: `${feat.color}18`,
-                      border: `1px solid ${feat.color}40`,
-                      color: feat.color,
-                    }}
+                    key={feat.title}
+                    className="p-3 rounded-xl glass border border-glass-border bg-white/2 hover:bg-white/4 transition flex items-start gap-3"
                   >
-                    <Icon className="w-4 h-4" />
+                    <div
+                      className="p-2 rounded-lg shrink-0 mt-0.5"
+                      style={{
+                        backgroundColor: `${feat.color}18`,
+                        border: `1px solid ${feat.color}40`,
+                        color: feat.color,
+                      }}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-white tracking-wide">
+                        {feat.title}
+                      </h3>
+                      <p className="text-[11px] text-[#d2e2ea]/55 leading-snug mt-0.5">
+                        {feat.desc}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white tracking-wide">
-                      {feat.title}
-                    </h3>
-                    <p className="text-[11px] text-[#d2e2ea]/55 leading-snug mt-1">
-                      {feat.desc}
-                    </p>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* Right Column: Cinematic High-Angle Supercar Hero Image (6 cols) */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.75, delay: 0.1 }}
+            className="lg:col-span-6"
+          >
+            <div className="relative rounded-2xl overflow-hidden glass border border-glass-border shadow-2xl bg-[#070d12] aspect-16/10 group">
+              {/* Zero-Latency Local High-Angle Studio Vector Artwork Base Layer */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/hero-supercar-high-angle.svg"
+                alt="High-Angle Studio Supercar Render"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+
+              {/* High-Angle Cinematic Dark Studio Supercar Photography Layer */}
+              <motion.img
+                initial={{ scale: 1.06, opacity: 0 }}
+                animate={{ scale: 1, opacity: 0.92 }}
+                transition={{ duration: 1.8, ease: "easeOut" }}
+                src="https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=1600&q=85"
+                alt="Cinematic High-Angle Supercar Hero Shot"
+                className="absolute inset-0 w-full h-full object-cover object-center mix-blend-lighten"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+
+              {/* Cinematic Vignette & Studio Rim Gradients */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background:
+                    "linear-gradient(180deg, rgba(6,9,11,0.55) 0%, rgba(6,9,11,0.05) 45%, rgba(6,9,11,0.88) 100%)",
+                }}
+              />
+
+              {/* Top Camera Telemetry Overlay on Hero Image */}
+              <div className="absolute top-3.5 left-3.5 right-3.5 flex items-center justify-between gap-2 pointer-events-none">
+                <div className="px-2.5 py-1 rounded-md bg-black/65 backdrop-blur-md border border-white/10 text-[9px] font-mono uppercase tracking-widest text-[#d2e2ea]/90 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#026dfe]" />
+                  <span>CAM 01 · HIGH-ANGLE 38° STUDIO OVERHEAD</span>
+                </div>
+                <div className="px-2.5 py-1 rounded-md bg-black/65 backdrop-blur-md border border-[#d16b54]/40 text-[9px] font-mono uppercase tracking-widest text-[#d16b54] flex items-center gap-1">
+                  <Gauge className="w-3 h-3" />
+                  <span>620 HP · 0-100 2.9S</span>
+                </div>
+              </div>
+
+              {/* Bottom Hero Caption & Spec Bar inside Image Card */}
+              <div className="absolute bottom-3.5 left-3.5 right-3.5 flex flex-col sm:flex-row sm:items-end justify-between gap-2 pointer-events-none">
+                <div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-[#026dfe]">
+                    Flagship Studio Preview
+                  </div>
+                  <div className="text-sm sm:text-base font-extrabold text-white tracking-wide">
+                    911 GT3 / R8 Aero Edition
+                  </div>
+                  <div className="text-[10px] text-[#d2e2ea]/65">
+                    Obsidian Satin Clearcoat · Forged Champagne Gold Turbines · Ceramic Calipers
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </motion.div>
+
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[9px] font-bold uppercase tracking-wider self-start sm:self-auto">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>60 FPS WebGL2 Ready</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </div>
 
       {/* Bottom Non-Blocking Background Loading Progress Footer */}
-      <footer className="relative z-10 w-full max-w-4xl mx-auto px-4 sm:px-8 pb-5 sm:pb-7">
+      <footer className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-8 pb-5 sm:pb-7">
         <div className="p-3.5 sm:p-4 rounded-2xl glass border border-glass-border bg-[#091117]/90 shadow-2xl space-y-2.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
             <div className="flex items-center gap-2.5">
