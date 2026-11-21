@@ -27,7 +27,7 @@ export default function Home() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
-  const [shouldEagerLoad, setShouldEagerLoad] = useState(false);
+  const [backgroundSceneStarted, setBackgroundSceneStarted] = useState(false);
   const [showHint, setShowHint] = useState(true);
   const [showSpecSheet, setShowSpecSheet] = useState(false);
   const [showARStickers, setShowARStickers] = useState(false);
@@ -57,13 +57,17 @@ export default function Home() {
     };
   }, []);
 
-  // Eagerly start the WebGL scene behind the landing page (skip on Safari/iOS,
-  // where heavy background WebGL initialisation hurts responsiveness)
+  // Yield first paint to the Landing Suspense Screen, then start the WebGL 3D scene setup in the background
   useEffect(() => {
-    if (isSafari) return;
-    const timer = setTimeout(() => setShouldEagerLoad(true), 50);
-    return () => clearTimeout(timer);
-  }, [isSafari]);
+    let timer: ReturnType<typeof setTimeout>;
+    const raf = requestAnimationFrame(() => {
+      timer = setTimeout(() => setBackgroundSceneStarted(true), 120);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, []);
 
   // Default config with first car's accent color
   const [config, setConfig] = useState<ConfigState>(() => {
@@ -361,7 +365,7 @@ export default function Home() {
         <div className="relative w-full flex-1 sm:h-full">
           <AnimatePresence>
             {!isLoaded && showConfigurator && (
-              <Loader progress={isLoaded ? 100 : 45} />
+              <Loader isSceneReady={isLoaded} />
             )}
           </AnimatePresence>
 
@@ -422,8 +426,8 @@ export default function Home() {
               </div>
             </motion.div>
 
-            {/* 3D Canvas */}
-            {(showConfigurator || shouldEagerLoad) && (
+            {/* 3D Canvas (Deferred by 120ms so initial landing suspense screen paints immediately without main-thread blocking) */}
+            {backgroundSceneStarted && (
               <ConfiguratorCanvas
                 config={config}
                 setConfig={setConfig}
