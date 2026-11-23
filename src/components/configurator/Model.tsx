@@ -2712,6 +2712,7 @@ export function Model({
 
     for (let i = 0; i < cabinGlassMaterials.length; i++) {
       const m = cabinGlassMaterials[i];
+      const needsShaderRecompile = !m.transparent || m.depthWrite !== false;
       m.transparent = true;
       m.depthWrite = false;
       if (tint === "limo") {
@@ -2731,7 +2732,9 @@ export function Model({
         m.roughness = 0.05;
         m.metalness = 0.1;
       }
-      m.needsUpdate = true;
+      if (needsShaderRecompile) {
+        m.needsUpdate = true;
+      }
     }
   }, [cabinGlassMaterials, config.windowTint]);
 
@@ -2742,6 +2745,7 @@ export function Model({
 
     for (let i = 0; i < headlightMaterials.length; i++) {
       const m = headlightMaterials[i];
+      const needsShaderRecompile = !m.transparent || m.depthWrite !== false;
       m.transparent = true;
       m.depthWrite = false;
       if (tint === "smoke") {
@@ -2762,19 +2766,30 @@ export function Model({
         m.roughness = 0.03;
         m.metalness = 0.1;
       }
-      m.needsUpdate = true;
+      if (needsShaderRecompile) {
+        m.needsUpdate = true;
+      }
     }
   }, [headlightMaterials, config.headlightTint]);
 
-  // Immediately apply matte vs metallic PBR finish whenever mattePaint, mainColor, or scene changes
+  // Update targetPaintColor uniform smoothly without triggering GLSL shader recompiles
+  useEffect(() => {
+    targetPaintColor.current.set(config.mainColor);
+  }, [config.mainColor]);
+
+  // Apply matte vs metallic PBR finish ONLY when mattePaint or scene actually changes
   useEffect(() => {
     const isMatte = Boolean(config.mattePaint);
+    const finishChanged = lastAppliedMatteRef.current !== isMatte;
     lastAppliedMatteRef.current = isMatte;
-    targetPaintColor.current.set(config.mainColor);
+
     const paintMats =
       (scene?.userData?.paintMaterials as MeshPhysicalMaterial[]) || EMPTY_MATS;
     for (let i = 0; i < paintMats.length; i++) {
       const mat = paintMats[i];
+      const targetClearcoat = isMatte ? 0.0 : 1.0;
+      const needsRecompile =
+        finishChanged && Math.abs(mat.clearcoat - targetClearcoat) > 0.01;
       if (isMatte) {
         mat.metalness = 0.0;
         mat.roughness = 0.9;
@@ -2792,9 +2807,11 @@ export function Model({
         mat.specularIntensity = 1.0;
         mat.envMapIntensity = 1.25;
       }
-      mat.needsUpdate = true;
+      if (needsRecompile) {
+        mat.needsUpdate = true;
+      }
     }
-  }, [scene, config.mattePaint, config.mainColor, config.selectedModel]);
+  }, [scene, config.mattePaint, config.selectedModel]);
 
   // When switching models, flag immediate sync without mutating local variables in effect
   useEffect(() => {

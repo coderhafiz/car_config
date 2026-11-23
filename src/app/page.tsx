@@ -69,10 +69,10 @@ export default function Home() {
     };
   }, []);
 
-  // Default config with first car's accent color
+  // Synchronously initialize config from URL (?config=...) or localStorage on frame 0 so it never flashes a previous state or double-loads a car after mount
   const [config, setConfig] = useState<ConfigState>(() => {
     const firstModel = MODELS[0];
-    return {
+    const baseDefault: ConfigState = {
       mainColor: "#0a0a0a", // Obsidian Black body
       accentColor: firstModel.accentColor, // Car-specific default accent
       interiorColor: "#1a1a1a", // Black interior
@@ -89,6 +89,49 @@ export default function Home() {
       headlightTint: "clear",
       tintedWindows: false,
     };
+
+    if (typeof window === "undefined") return baseDefault;
+
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sharedConfig = urlParams.get("config");
+      if (sharedConfig) {
+        const decoded = JSON.parse(atob(sharedConfig)) as Partial<ConfigState>;
+        if (
+          decoded.selectedModel &&
+          !MODELS.some((m) => m.id === decoded.selectedModel)
+        ) {
+          delete decoded.selectedModel;
+        }
+        return {
+          ...baseDefault,
+          ...decoded,
+          stickerPlacementMode: false,
+          isAnimated: false,
+        };
+      }
+
+      const savedStr = window.localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
+      if (savedStr) {
+        const saved = JSON.parse(savedStr) as Partial<ConfigState>;
+        if (
+          saved &&
+          saved.selectedModel &&
+          MODELS.some((m) => m.id === saved.selectedModel)
+        ) {
+          return {
+            ...baseDefault,
+            ...saved,
+            stickerPlacementMode: false,
+            isAnimated: false,
+          };
+        }
+      }
+    } catch {
+      // Ignore storage errors in private browsing
+    }
+
+    return baseDefault;
   });
 
   const selectedModelId = config.selectedModel;
@@ -103,56 +146,6 @@ export default function Home() {
       modelId: selectedModelId,
     });
   }, [selectedModelId]);
-
-  // Restore saved car model & configuration on subsequent visits (or apply ?config=... if shared)
-  useEffect(() => {
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sharedConfig = urlParams.get("config");
-
-      if (sharedConfig) {
-        let decoded: Partial<ConfigState> = {};
-        try {
-          decoded = JSON.parse(atob(sharedConfig));
-        } catch (e) {
-          console.error("Failed to parse shared config", e);
-        }
-        if (
-          decoded.selectedModel &&
-          !MODELS.some((m) => m.id === decoded.selectedModel)
-        ) {
-          delete decoded.selectedModel;
-        }
-        const timer = setTimeout(() => {
-          setConfig((prev) => ({ ...prev, ...decoded }));
-          setShowConfigurator(true);
-        }, 0);
-        return () => clearTimeout(timer);
-      }
-
-      // Check localStorage for previously saved 3D car model & options
-      const savedStr = window.localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
-      if (savedStr) {
-        const saved = JSON.parse(savedStr) as Partial<ConfigState>;
-        if (
-          saved &&
-          saved.selectedModel &&
-          MODELS.some((m) => m.id === saved.selectedModel)
-        ) {
-          console.log(
-            "[Config] Restoring saved 3D car model from prior visit:",
-            saved.selectedModel,
-          );
-          const timer = setTimeout(() => {
-            setConfig((prev) => ({ ...prev, ...saved }));
-          }, 0);
-          return () => clearTimeout(timer);
-        }
-      }
-    } catch {
-      // Ignore storage errors in private browsing
-    }
-  }, []);
 
   // Persist the user's chosen 3D car model and customizations for subsequent visits (debounced to keep 60fps on mobile)
   useEffect(() => {
