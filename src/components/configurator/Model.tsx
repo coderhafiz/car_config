@@ -3070,13 +3070,13 @@ function createMatteWhiteShowroomTextures(): {
     for (let x = 0; x < size; x++) {
       const idx = (y * size + x) * 4;
 
-      // Uniform fine-grain matte architectural finish around mid gray (#80848a) with zero tiling wave
+      // Pure neutral white micro-grain so material.color expresses the exact car hue without any grey tint
       const micro = (rand() - 0.5) * 4;
-      const val = Math.max(124, Math.min(136, Math.round(130 + micro)));
+      const val = Math.max(246, Math.min(255, Math.round(252 + micro)));
 
       dData[idx] = val;
-      dData[idx + 1] = val + 2;
-      dData[idx + 2] = val + 5;
+      dData[idx + 1] = val;
+      dData[idx + 2] = val;
       dData[idx + 3] = 255;
 
       const bVal = Math.max(0, Math.min(255, Math.round(128 + micro * 4)));
@@ -3113,38 +3113,7 @@ function createMatteWhiteShowroomTextures(): {
  *   sophisticated architectural studio tint harmonizing with the car's body color.
  */
 function getShowroomColorForCar(carHex: string): Color {
-  const c = new Color(carHex);
-  const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-  const result = new Color();
-
-  if (lum < 0.12) {
-    // Dark / stealth paint: dark studio charcoal with subtle tint of car hue
-    const baseDark = 0.13 + lum * 0.4;
-    result.setRGB(
-      baseDark * 0.82 + c.r * 0.18,
-      baseDark * 0.82 + c.g * 0.18,
-      baseDark * 0.82 + c.b * 0.18,
-    );
-  } else if (lum > 0.75) {
-    // Bright / white paint: clean, crisp gallery off-white
-    const baseLight = 0.78 + (lum - 0.75) * 0.45;
-    result.setRGB(
-      baseLight * 0.88 + c.r * 0.12,
-      baseLight * 0.88 + c.g * 0.12,
-      baseLight * 0.88 + c.b * 0.12,
-    );
-  } else {
-    // Chromatic / mid-tone paint: luxury architectural studio tint
-    // Neutral mid-gray base (~0.44) blended with 38% car color
-    const baseGray = 0.44;
-    result.setRGB(
-      baseGray * 0.62 + c.r * 0.38,
-      baseGray * 0.62 + c.g * 0.38,
-      baseGray * 0.62 + c.b * 0.38,
-    );
-  }
-
-  return result;
+  return new Color(carHex);
 }
 
 export function Showroom({
@@ -3192,7 +3161,7 @@ export function Showroom({
     // automatically culls exterior walls if the camera orbits outside the room.
     const cubeInteriorMat = new MeshPhysicalMaterial({
       name: "ShowroomCubeInterior",
-      color: "#80848a",
+      color: mainColor,
       map: diffuseMap,
       bumpMap: bumpMap,
       bumpScale: 0.015,
