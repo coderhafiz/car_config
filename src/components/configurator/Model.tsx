@@ -3161,7 +3161,7 @@ export function Showroom({
     // automatically culls exterior walls if the camera orbits outside the room.
     const cubeInteriorMat = new MeshPhysicalMaterial({
       name: "ShowroomCubeInterior",
-      color: mainColor,
+      color: "#0a0a0a",
       map: diffuseMap,
       bumpMap: bumpMap,
       bumpScale: 0.015,
@@ -3326,6 +3326,17 @@ export function Showroom({
     () => getShowroomColorForCar(mainColor),
     [mainColor],
   );
+
+  // Immediately sync initial showroom wall color on scene creation without re-cloning geometry
+  useEffect(() => {
+    const cubeMat = scene?.userData?.cubeInteriorMat as
+      | MeshPhysicalMaterial
+      | undefined;
+    if (cubeMat) {
+      cubeMat.color.copy(getShowroomColorForCar(mainColor));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene]);
 
   useEffect(() => {
     if (logoSpotRef.current) {
