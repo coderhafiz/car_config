@@ -57,22 +57,10 @@ export default function Home() {
     };
   }, []);
 
-  // Yield first paint to the Landing Suspense Screen, then start the WebGL 3D scene setup in the background
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const raf = requestAnimationFrame(() => {
-      timer = setTimeout(() => setBackgroundSceneStarted(true), 120);
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timer);
-    };
-  }, []);
-
-  // Synchronously initialize config from URL (?config=...) or localStorage on frame 0 so it never flashes a previous state or double-loads a car after mount
+  // Default deterministic config for SSR & initial hydration match
   const [config, setConfig] = useState<ConfigState>(() => {
     const firstModel = MODELS[0];
-    const baseDefault: ConfigState = {
+    return {
       mainColor: "#0a0a0a", // Obsidian Black body
       accentColor: firstModel.accentColor, // Car-specific default accent
       interiorColor: "#1a1a1a", // Black interior
@@ -89,53 +77,63 @@ export default function Home() {
       headlightTint: "clear",
       tintedWindows: false,
     };
+  });
 
-    if (typeof window === "undefined") return baseDefault;
-
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sharedConfig = urlParams.get("config");
-      if (sharedConfig) {
-        const decoded = JSON.parse(atob(sharedConfig)) as Partial<ConfigState>;
-        if (
-          decoded.selectedModel &&
-          !MODELS.some((m) => m.id === decoded.selectedModel)
-        ) {
-          delete decoded.selectedModel;
-        }
-        return {
-          ...baseDefault,
-          ...decoded,
-          stickerPlacementMode: false,
-          isAnimated: false,
-        };
-      }
-
-      const savedStr = window.localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
-      if (savedStr) {
-        const saved = JSON.parse(savedStr) as Partial<ConfigState>;
-        if (
-          saved &&
-          saved.selectedModel &&
-          MODELS.some((m) => m.id === saved.selectedModel)
-        ) {
-          return {
-            ...baseDefault,
-            ...saved,
+  // Restore saved config inside requestAnimationFrame BEFORE starting the background 3D scene
+  // -> 0 hydration mismatch, 0 flash of previous state, and 0 duplicate car model loading
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const raf = requestAnimationFrame(() => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sharedConfig = urlParams.get("config");
+        if (sharedConfig) {
+          const decoded = JSON.parse(atob(sharedConfig)) as Partial<ConfigState>;
+          if (
+            decoded.selectedModel &&
+            !MODELS.some((m) => m.id === decoded.selectedModel)
+          ) {
+            delete decoded.selectedModel;
+          }
+          setConfig((prev) => ({
+            ...prev,
+            ...decoded,
             stickerPlacementMode: false,
             isAnimated: false,
-          };
+          }));
+        } else {
+          const savedStr = window.localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
+          if (savedStr) {
+            const saved = JSON.parse(savedStr) as Partial<ConfigState>;
+            if (
+              saved &&
+              saved.selectedModel &&
+              MODELS.some((m) => m.id === saved.selectedModel)
+            ) {
+              setConfig((prev) => ({
+                ...prev,
+                ...saved,
+                stickerPlacementMode: false,
+                isAnimated: false,
+              }));
+            }
+          }
         }
+      } catch {
+        // Ignore storage errors in private browsing
       }
-    } catch {
-      // Ignore storage errors in private browsing
-    }
 
-    return baseDefault;
-  });
+      timer = setTimeout(() => setBackgroundSceneStarted(true), 120);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, []);
 
   const selectedModelId = config.selectedModel;
   useEffect(() => {
+    if (!backgroundSceneStarted) return;
     captureUTMParams();
     const isMobile = window.innerWidth < 768;
     const isTablet = window.innerWidth >= 768 && window.innerWidth < 1024;
@@ -145,10 +143,11 @@ export default function Home() {
       screenHeight: window.innerHeight,
       modelId: selectedModelId,
     });
-  }, [selectedModelId]);
+  }, [selectedModelId, backgroundSceneStarted]);
 
-  // Persist the user's chosen 3D car model and customizations for subsequent visits (debounced to keep 60fps on mobile)
+  // Persist the user's chosen 3D car model and customizations for subsequent visits (debounced, only after initial restore)
   useEffect(() => {
+    if (!backgroundSceneStarted) return;
     const timer = setTimeout(() => {
       try {
         if (typeof window !== "undefined" && window.localStorage) {
@@ -162,7 +161,7 @@ export default function Home() {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [config]);
+  }, [config, backgroundSceneStarted]);
 
   const selectedModelInfo = useMemo(
     () => MODELS.find((m) => m.id === selectedModelId) || MODELS[0],
